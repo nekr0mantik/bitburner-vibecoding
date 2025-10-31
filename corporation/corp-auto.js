@@ -101,6 +101,9 @@ export async function main(ns) {
             try {
                 ns.corporation.expandIndustry(AGRICULTURE, AGRICULTURE);
                 ns.print(`✓ Created ${AGRICULTURE} division`);
+                state.phase = 1;
+                state.subPhase = 0;
+                return; // Wait for next iteration to let division initialize
             } catch (e) {
                 ns.print(`⏳ Waiting to create ${AGRICULTURE} division`);
                 return;
@@ -118,6 +121,13 @@ export async function main(ns) {
     async function phase1_SmartSupply(ns, corp, state) {
         ns.print("=== PHASE 1: Smart Supply ===");
 
+        // Verify Agriculture division exists
+        const divisions = corp.divisions || [];
+        if (!divisions.includes(AGRICULTURE)) {
+            ns.print(`⏳ Waiting for ${AGRICULTURE} division to be ready`);
+            return;
+        }
+
         // Check if Smart Supply is unlocked
         const hasSmartSupply = ns.corporation.hasUnlock("Smart Supply");
         if (!hasSmartSupply) {
@@ -132,19 +142,9 @@ export async function main(ns) {
             }
         }
 
-        // Enable Smart Supply in Sector-12
-        const division = ns.corporation.getDivision(AGRICULTURE);
-        if (division.cities.includes("Sector-12")) {
-            try {
-                ns.corporation.setSmartSupply(AGRICULTURE, "Sector-12", true);
-                ns.corporation.setSmartSupplyUseLeftovers(AGRICULTURE, "Sector-12", true);
-                ns.print(`✓ Enabled Smart Supply in Sector-12`);
-            } catch (e) {
-                // Already enabled
-            }
-        }
-
-        ns.print(`✓ Smart Supply ready`);
+        // Smart Supply is unlocked, move to expansion phase
+        // (We'll enable it when we expand to cities in Phase 2)
+        ns.print(`✓ Smart Supply unlocked`);
         state.phase = 2;
         state.subPhase = 0;
     }
