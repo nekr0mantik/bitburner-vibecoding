@@ -213,7 +213,20 @@ export async function main(ns) {
 
         // Track warfare assignments
         let warfareAssigned = 0;
-        let vigilanteNeeded = highWantedPenalty;
+
+        // Calculate how many members should do vigilante justice based on penalty level
+        // Scale: 1 member per 2.5% penalty, up to half the gang (max 6)
+        let vigilanteCount = 0;
+        if (highWantedPenalty) {
+            vigilanteCount = Math.min(
+                Math.ceil(wantedPenalty / 2.5),  // 1 member per 2.5% penalty
+                Math.floor(members.length / 2),   // Up to half the gang
+                6                                  // Cap at 6 members max
+            );
+            ns.print(`⚠️  High wanted penalty detected (${wantedPenalty.toFixed(2)}%)`);
+            ns.print(`   Assigning ${vigilanteCount} member${vigilanteCount !== 1 ? 's' : ''} to vigilante justice`);
+        }
+        let vigilanteAssigned = 0;
 
         for (const memberData of memberInfos) {
             const { name, info, avgCombatStats } = memberData;
@@ -222,11 +235,10 @@ export async function main(ns) {
             if (fullyControlled) {
                 // 100% territory - everyone does arms trafficking
                 newTask = TASKS.TRAFFIC_ARMS;
-            } else if (highWantedPenalty && vigilanteNeeded && avgCombatStats >= TRAINING_STATS_THRESHOLD) {
-                // High wanted penalty (bad) - assign one trained member to vigilante justice
+            } else if (vigilanteAssigned < vigilanteCount && avgCombatStats >= TRAINING_STATS_THRESHOLD) {
+                // High wanted penalty - assign multiple trained members to vigilante justice
                 newTask = TASKS.VIGILANTE_JUSTICE;
-                vigilanteNeeded = false; // Only need one member on vigilante
-                ns.print(`⚠️  High wanted penalty detected (${wantedPenalty.toFixed(2)}%)`);
+                vigilanteAssigned++;
             } else if (avgCombatStats < TRAINING_STATS_THRESHOLD) {
                 // Low stats - train combat first
                 newTask = TASKS.TRAIN_COMBAT;
