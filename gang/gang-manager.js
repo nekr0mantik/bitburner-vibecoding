@@ -216,10 +216,10 @@ export async function main(ns) {
         let vigilanteAssigned = 0;
 
         // When wanted penalty is high, it negates ALL gang gains
-        // Priority: get penalty under control ASAP by assigning most members to vigilante
+        // Priority: get penalty under control ASAP by assigning ALL members to vigilante
         if (highWantedPenalty) {
             ns.print(`⚠️  HIGH WANTED PENALTY: ${wantedPenalty.toFixed(2)}% (negates all gains!)`);
-            ns.print(`   PRIORITY: Vigilante justice until penalty < ${WANTED_PENALTY_THRESHOLD}%`);
+            ns.print(`   PRIORITY: ALL ${members.length} members on vigilante justice`);
         }
 
         for (const memberData of memberInfos) {
@@ -231,14 +231,9 @@ export async function main(ns) {
                 newTask = TASKS.TRAFFIC_ARMS;
             } else if (highWantedPenalty) {
                 // HIGH PRIORITY: Wanted penalty negates all gains
-                // All trained members do vigilante justice
-                if (avgCombatStats >= TRAINING_STATS_THRESHOLD) {
-                    newTask = TASKS.VIGILANTE_JUSTICE;
-                    vigilanteAssigned++;
-                } else {
-                    // Only untrained members continue training
-                    newTask = TASKS.TRAIN_COMBAT;
-                }
+                // ALL members do vigilante justice - no exceptions
+                newTask = TASKS.VIGILANTE_JUSTICE;
+                vigilanteAssigned++;
             } else if (avgCombatStats < TRAINING_STATS_THRESHOLD) {
                 // Low stats - train combat first
                 newTask = TASKS.TRAIN_COMBAT;
