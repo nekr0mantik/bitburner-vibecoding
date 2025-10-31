@@ -231,18 +231,22 @@ export async function main(ns) {
             }
 
             // Hire 3 employees
-            const currentOffice = ns.corporation.getOffice(AGRICULTURE, city);
-            const employees = currentOffice.employees || [];
+            let currentOffice = ns.corporation.getOffice(AGRICULTURE, city);
+            let employees = currentOffice.employees || [];
             if (employees.length < 3) {
                 try {
                     ns.corporation.hireEmployee(AGRICULTURE, city);
                     ns.print(`✓ Hired employee in ${city} (${employees.length + 1}/3)`);
                     return; // One at a time
                 } catch (e) {
-                    ns.print(`⏳ Can't hire in ${city}`);
+                    ns.print(`⏳ Can't hire in ${city}: ${e}`);
                     return;
                 }
             }
+
+            // Refresh employee count after all hiring is done
+            currentOffice = ns.corporation.getOffice(AGRICULTURE, city);
+            employees = currentOffice.employees || [];
 
             // Assign employees: Operations, Engineer, Business
             if (employees.length >= 3) {
