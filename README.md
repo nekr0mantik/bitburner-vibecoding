@@ -14,7 +14,7 @@ A collection of automation scripts for the game Bitburner to help manage various
 - Automatic member recruitment
 - Smart training progression
 - Respect farming via terrorism for faster recruitment
-- Wanted level management with automatic vigilante justice (when penalty drops below 99%)
+- Wanted level management with automatic vigilante justice (when penalty > 1%)
 - Equipment purchasing
 - Optimized warfare strategy (top 6 fight, others earn money)
 - Territory warfare with intelligent clash engagement (95% win threshold)
