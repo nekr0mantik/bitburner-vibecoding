@@ -230,13 +230,21 @@ export async function main(ns) {
                 }
             }
 
-            // Hire 3 employees
-            let currentOffice = ns.corporation.getOffice(AGRICULTURE, city);
-            let employees = currentOffice.employees || [];
-            if (employees.length < 3) {
+            // Hire 3 employees directly into positions
+            const currentOffice = ns.corporation.getOffice(AGRICULTURE, city);
+            const employeeCount = currentOffice.numEmployees || 0;
+
+            // Hire employees into specific positions
+            const positions = ["Operations", "Engineer", "Business"];
+            if (employeeCount < 3) {
+                const position = positions[employeeCount];
                 try {
-                    ns.corporation.hireEmployee(AGRICULTURE, city);
-                    ns.print(`✓ Hired employee in ${city} (${employees.length + 1}/3)`);
+                    const hired = ns.corporation.hireEmployee(AGRICULTURE, city, position);
+                    if (hired) {
+                        ns.print(`✓ Hired ${position} in ${city} (${employeeCount + 1}/3)`);
+                    } else {
+                        ns.print(`⏳ Failed to hire ${position} in ${city}`);
+                    }
                     return; // One at a time
                 } catch (e) {
                     ns.print(`⏳ Can't hire in ${city}: ${e}`);
@@ -244,24 +252,8 @@ export async function main(ns) {
                 }
             }
 
-            // Refresh employee count after all hiring is done
-            currentOffice = ns.corporation.getOffice(AGRICULTURE, city);
-            employees = currentOffice.employees || [];
-
-            // Assign employees: Operations, Engineer, Business
-            if (employees.length >= 3) {
-                try {
-                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Operations", 1);
-                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Engineer", 1);
-                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Business", 1);
-                    ns.print(`  ✓ Assigned employees in ${city}`);
-                } catch (e) {
-                    ns.print(`  ⚠ Assignment failed in ${city}: ${e}`);
-                }
-            }
-
-            // Enable Smart Supply
-            if (employees.length >= 3) {
+            // Enable Smart Supply (after all 3 employees are hired)
+            if (employeeCount >= 3) {
                 try {
                     ns.corporation.setSmartSupply(AGRICULTURE, city, true);
                     ns.corporation.setSmartSupplyUseLeftovers(AGRICULTURE, city, true);
@@ -412,30 +404,30 @@ export async function main(ns) {
                     }
                 }
 
-                // Hire up to 9
-                while (true) {
-                    const currentOffice = ns.corporation.getOffice(AGRICULTURE, city);
-                    const employees = currentOffice.employees || [];
-                    if (employees.length >= 9) break;
+                // Hire up to 9 employees directly into positions
+                // Target: Ops(2), Eng(2), Bus(1), Mgmt(2), R&D(2)
+                const currentOffice = ns.corporation.getOffice(AGRICULTURE, city);
+                const employeeCount = currentOffice.numEmployees || 0;
+
+                if (employeeCount < 9) {
+                    const positions = [
+                        "Operations", "Operations",
+                        "Engineer", "Engineer",
+                        "Business",
+                        "Management", "Management",
+                        "Research & Development", "Research & Development"
+                    ];
+                    const position = positions[employeeCount];
 
                     try {
-                        ns.corporation.hireEmployee(AGRICULTURE, city);
+                        const hired = ns.corporation.hireEmployee(AGRICULTURE, city, position);
+                        if (hired) {
+                            ns.print(`✓ Hired ${position} in ${city} (${employeeCount + 1}/9)`);
+                        }
+                        return; // One at a time
                     } catch (e) {
-                        break;
-                    }
-                }
-
-                // Assign: Ops(2), Eng(2), Bus(1), Mgmt(2), R&D(2)
-                const finalOffice = ns.corporation.getOffice(AGRICULTURE, city);
-                if ((finalOffice.employees || []).length >= 9) {
-                    try {
-                        ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Operations", 2);
-                        ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Engineer", 2);
-                        ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Business", 1);
-                        ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Management", 2);
-                        ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Research & Development", 2);
-                    } catch (e) {
-                        // Assignment failed
+                        ns.print(`⏳ Can't hire ${position} in ${city}: ${e}`);
+                        return;
                     }
                 }
             }
