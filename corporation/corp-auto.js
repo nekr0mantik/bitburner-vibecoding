@@ -252,7 +252,6 @@ export async function main(ns) {
             if (employeeCount >= 3) {
                 try {
                     ns.corporation.setSmartSupply(AGRICULTURE, city, true);
-                    ns.corporation.setSmartSupplyUseLeftovers(AGRICULTURE, city, true);
                     ns.print(`  ✓ Smart Supply enabled in ${city}`);
                 } catch (e) {
                     ns.print(`  ⚠ Smart Supply failed in ${city}: ${e}`);
