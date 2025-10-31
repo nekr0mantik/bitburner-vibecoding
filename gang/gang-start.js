@@ -8,10 +8,22 @@ export async function main(ns) {
 
     ns.tprint("=== Gathering Gang Configuration ===");
 
+    // Hacking equipment to exclude (useless for combat gangs)
+    const hackingEquipment = [
+        "NUKE Rootkit",
+        "Soulstealer Rootkit",
+        "Hmap Node",
+        "Demon Rootkit",
+        "Jack the Ripper",
+        "Bitwire",
+        "Neuralstimulator",
+        "DataJack"
+    ];
+
     // Gather static information that doesn't change
     const config = {
-        // List of all equipment (static)
-        equipment: ns.gang.getEquipmentNames(),
+        // List of all equipment (static) - filter out hacking equipment for combat gangs
+        equipment: ns.gang.getEquipmentNames().filter(item => !hackingEquipment.includes(item)),
 
         // List of all other gangs (static)
         otherGangs: [
