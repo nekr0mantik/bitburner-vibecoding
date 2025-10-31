@@ -211,6 +211,14 @@ export async function main(ns) {
         // Sort by combat stats (highest first) for warfare assignment
         const sortedByStats = [...memberInfos].sort((a, b) => b.avgCombatStats - a.avgCombatStats);
 
+        // Find trained member with lowest respect to keep on terrorism (spreads respect before ascension)
+        const trainedMembers = memberInfos.filter(m => m.avgCombatStats >= TRAINING_STATS_THRESHOLD);
+        const lowestRespectMember = trainedMembers.length > 0
+            ? trainedMembers.reduce((lowest, current) =>
+                current.info.earnedRespect < lowest.info.earnedRespect ? current : lowest
+              ).name
+            : null;
+
         // Track assignments
         let warfareAssigned = 0;
         let vigilanteAssigned = 0;
@@ -220,6 +228,9 @@ export async function main(ns) {
         if (highWantedPenalty) {
             ns.print(`⚠️  HIGH WANTED PENALTY: ${wantedPenalty.toFixed(2)}% (negates all gains!)`);
             ns.print(`   PRIORITY: All trained members on vigilante justice`);
+            if (lowestRespectMember) {
+                ns.print(`   EXCEPT: ${lowestRespectMember} (lowest respect) stays on terrorism`);
+            }
         }
 
         for (const memberData of memberInfos) {
@@ -229,11 +240,14 @@ export async function main(ns) {
             if (fullyControlled) {
                 // 100% territory - everyone does arms trafficking
                 newTask = TASKS.TRAFFIC_ARMS;
-            } else if (highWantedPenalty && avgCombatStats >= TRAINING_STATS_THRESHOLD) {
+            } else if (highWantedPenalty && avgCombatStats >= TRAINING_STATS_THRESHOLD && name !== lowestRespectMember) {
                 // HIGH PRIORITY: Wanted penalty negates all gains
-                // All trained members do vigilante justice (no cap)
+                // All trained members do vigilante justice (except lowest respect member)
                 newTask = TASKS.VIGILANTE_JUSTICE;
                 vigilanteAssigned++;
+            } else if (highWantedPenalty && name === lowestRespectMember) {
+                // Keep lowest-respect member on terrorism to spread respect gains
+                newTask = TASKS.TERRORISM;
             } else if (avgCombatStats < TRAINING_STATS_THRESHOLD) {
                 // Low stats - train combat first
                 newTask = TASKS.TRAIN_COMBAT;
