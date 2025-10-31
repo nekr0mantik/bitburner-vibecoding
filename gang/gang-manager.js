@@ -33,7 +33,20 @@ export async function main(ns) {
         return;
     }
 
+    // Load static configuration from file
+    const configPath = "/tmp/gang-config.txt";
+    if (!ns.fileExists(configPath)) {
+        ns.print("ERROR: Configuration file not found!");
+        ns.print("Please run gang/gang-start.js first.");
+        return;
+    }
+
+    const configData = ns.read(configPath);
+    const config = JSON.parse(configData);
+
     ns.print("=== Gang Manager Started ===");
+    ns.print(`Gang: ${config.gangFaction}`);
+    ns.print(`Equipment available: ${config.equipment.length}`);
     ns.print(`Ascension threshold: ${ASCENSION_MULTIPLIER_THRESHOLD}x`);
     ns.print(`Territory clash threshold: ${TERRITORY_CLASH_WIN_THRESHOLD * 100}%`);
 
@@ -64,7 +77,7 @@ export async function main(ns) {
             await checkAscensions(ns, members);
 
             // 3. Manage equipment for all members
-            await manageEquipment(ns, members);
+            await manageEquipment(ns, members, config.equipment);
 
             // 4. Assign tasks to members
             await assignTasks(ns, members, territory);
@@ -73,7 +86,7 @@ export async function main(ns) {
             displayTaskDistribution(ns, members);
 
             // 6. Manage territory warfare
-            await manageTerritoryWarfare(ns, territory);
+            await manageTerritoryWarfare(ns, territory, config.otherGangs);
 
         } catch (error) {
             ns.print(`ERROR: ${error}`);
@@ -148,14 +161,13 @@ export async function main(ns) {
     /**
      * Purchase equipment for gang members
      */
-    async function manageEquipment(ns, members) {
-        const allEquipment = ns.gang.getEquipmentNames();
+    async function manageEquipment(ns, members, equipmentList) {
         let purchasesMade = 0;
 
         for (const member of members) {
             const memberInfo = ns.gang.getMemberInformation(member);
 
-            for (const equipment of allEquipment) {
+            for (const equipment of equipmentList) {
                 // Skip if member already has this equipment
                 if (memberInfo.upgrades.includes(equipment) ||
                     memberInfo.augmentations.includes(equipment)) {
@@ -278,7 +290,7 @@ export async function main(ns) {
     /**
      * Manage territory warfare - enable clashes when win chance is high enough
      */
-    async function manageTerritoryWarfare(ns, currentTerritory) {
+    async function manageTerritoryWarfare(ns, currentTerritory, otherGangs) {
         const gangInfo = ns.gang.getGangInformation();
 
         // If we have 100% territory, disable warfare
@@ -289,12 +301,6 @@ export async function main(ns) {
             }
             return;
         }
-
-        // Get all other gangs
-        const otherGangs = [
-            "Slum Snakes", "Tetrads", "The Syndicate",
-            "The Dark Army", "Speakers for the Dead", "NiteSec", "The Black Hand"
-        ].filter(gang => gang !== gangInfo.faction);
 
         // Calculate minimum win chance against all gangs
         let minWinChance = 1.0;

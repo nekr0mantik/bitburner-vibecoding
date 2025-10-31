@@ -13,19 +13,26 @@ An automated gang management script for the game Bitburner that handles all aspe
 - **Territory Warfare**: Manages territory warfare with intelligent clash engagement (95% win threshold)
 - **Ascension Management**: Ascends members when their bonuses would double (2x multiplier)
 - **Optimized Money Making**: Switches to arms trafficking after 100% territory control
+- **RAM Optimized**: Split into starter and manager scripts to minimize RAM usage
 
 ## How to Use
 
 1. **Start a Gang**: Make sure you've already created a gang in Bitburner (requires specific faction membership)
 
-2. **Upload the Script**: Copy `gang-manager.js` to your Bitburner home server
+2. **Upload the Scripts**: Copy both `gang-start.js` and `gang-manager.js` to your Bitburner home server in the `gang/` folder
 
-3. **Run the Script**:
+3. **Run the Starter Script**:
    ```
-   run gang-manager.js
+   run gang/gang-start.js
    ```
+   This will:
+   - Gather static configuration data (equipment list, other gangs)
+   - Save it to `/tmp/gang-config.txt`
+   - Automatically start the main manager
 
-4. **Let it Run**: The script will continuously manage your gang operations. You can minimize the window and let it work in the background.
+4. **Let it Run**: The manager will continuously handle all gang operations. You can minimize the window and let it work in the background.
+
+**Note**: Always run `gang-start.js` first. It will automatically launch `gang-manager.js` with the optimized configuration.
 
 ## Strategy
 
@@ -59,6 +66,25 @@ An automated gang management script for the game Bitburner that handles all aspe
 - This task scales best with territory controlled
 - Continues ascension management
 - Maximizes income generation
+
+## Architecture
+
+The gang management system uses a two-script architecture for RAM optimization:
+
+### gang-start.js (Starter)
+- Gathers static configuration data that doesn't change during gameplay
+- Collects list of all available equipment (expensive `getEquipmentNames()` call)
+- Builds list of enemy gangs
+- Writes configuration to `/tmp/gang-config.txt`
+- Automatically launches the main manager with `spawn()`
+
+### gang-manager.js (Main Manager)
+- Reads static configuration from file instead of calling expensive functions
+- Runs the main management loop with minimal RAM footprint
+- All dynamic operations (member info, gang stats, territory) still queried in real-time
+- Continues running until manually stopped
+
+**RAM Benefit**: By moving expensive one-time API calls out of the main loop script, the manager requires significantly less RAM to run continuously.
 
 ## Configuration
 

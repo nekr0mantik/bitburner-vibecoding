@@ -20,11 +20,13 @@ A collection of automation scripts for the game Bitburner to help manage various
 - Territory warfare with intelligent clash engagement (95% win threshold)
 - Ascension management (ascend at 2x multiplier threshold)
 - Optimized money making (arms trafficking after 100% territory)
+- RAM optimized (split architecture reduces memory footprint)
 
 **Usage**:
 ```
-run gang/gang-manager.js
+run gang/gang-start.js
 ```
+(This will automatically launch the optimized manager)
 
 **Documentation**: [gang/README.md](gang/README.md)
 
@@ -36,7 +38,8 @@ run gang/gang-manager.js
 bitburner-vibecoding/
 ├── README.md                 # This file - main script index
 └── gang/
-    ├── gang-manager.js       # Gang automation script
+    ├── gang-start.js         # Starter script (run this first)
+    ├── gang-manager.js       # Main gang automation script
     └── README.md             # Detailed gang manager documentation
 ```
 
