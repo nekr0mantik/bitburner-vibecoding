@@ -69,7 +69,10 @@ export async function main(ns) {
             // 4. Assign tasks to members
             await assignTasks(ns, members, territory);
 
-            // 5. Manage territory warfare
+            // 5. Display task distribution
+            displayTaskDistribution(ns, members);
+
+            // 6. Manage territory warfare
             await manageTerritoryWarfare(ns, territory);
 
         } catch (error) {
@@ -243,6 +246,33 @@ export async function main(ns) {
                 ns.print(`📋 ${name}: ${info.task} → ${newTask}`);
             }
         }
+    }
+
+    /**
+     * Display task distribution across all gang members
+     */
+    function displayTaskDistribution(ns, members) {
+        const taskCounts = {};
+
+        // Count members assigned to each task
+        for (const member of members) {
+            const memberInfo = ns.gang.getMemberInformation(member);
+            const task = memberInfo.task;
+
+            if (!taskCounts[task]) {
+                taskCounts[task] = 0;
+            }
+            taskCounts[task]++;
+        }
+
+        // Display task distribution
+        ns.print("=== Task Distribution ===");
+        const sortedTasks = Object.entries(taskCounts).sort((a, b) => b[1] - a[1]);
+
+        for (const [task, count] of sortedTasks) {
+            ns.print(`  ${task}: ${count} member${count !== 1 ? 's' : ''}`);
+        }
+        ns.print("");
     }
 
     /**
