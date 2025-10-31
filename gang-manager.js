@@ -1,0 +1,255 @@
+/** @param {NS} ns */
+export async function main(ns) {
+    // Configuration
+    const ASCENSION_MULTIPLIER_THRESHOLD = 2.0; // Ascend when new multiplier is 2x current
+    const TERRITORY_CLASH_WIN_THRESHOLD = 0.95; // Enable clashes at 95% win chance
+    const EQUIPMENT_PURCHASE_DELAY = 100; // ms between equipment purchases
+    const TRAINING_STATS_THRESHOLD = 100; // Train until stats reach this level
+    const TERRITORY_WAR_STATS_THRESHOLD = 300; // Switch to territory war after this
+    const UPDATE_INTERVAL = 10000; // 10 seconds between main loop iterations
+
+    // Task names in Bitburner
+    const TASKS = {
+        TRAIN_COMBAT: "Train Combat",
+        TRAIN_HACKING: "Train Hacking",
+        TRAIN_CHARISMA: "Train Charisma",
+        TERRITORY_WARFARE: "Territory Warfare",
+        TRAFFIC_ARMS: "Traffick Illegal Arms",
+        UNASSIGNED: "Unassigned"
+    };
+
+    ns.disableLog("ALL");
+    ns.clearLog();
+    ns.tail();
+
+    // Check if we're in a gang
+    if (!ns.gang.inGang()) {
+        ns.print("ERROR: Not in a gang! Please create a gang first.");
+        return;
+    }
+
+    ns.print("=== Gang Manager Started ===");
+    ns.print(`Ascension threshold: ${ASCENSION_MULTIPLIER_THRESHOLD}x`);
+    ns.print(`Territory clash threshold: ${TERRITORY_CLASH_WIN_THRESHOLD * 100}%`);
+
+    while (true) {
+        try {
+            // Get current gang information
+            const gangInfo = ns.gang.getGangInformation();
+            const members = ns.gang.getMemberNames();
+            const territory = gangInfo.territory;
+
+            ns.clearLog();
+            ns.print("=== Gang Manager Status ===");
+            ns.print(`Gang: ${gangInfo.faction}`);
+            ns.print(`Members: ${members.length} / ${ns.gang.getMaxMemberCount()}`);
+            ns.print(`Territory: ${(territory * 100).toFixed(2)}%`);
+            ns.print(`Respect: ${ns.formatNumber(gangInfo.respect)}`);
+            ns.print(`Wanted Level: ${ns.formatNumber(gangInfo.wantedLevel)}`);
+            ns.print("");
+
+            // 1. Recruit new members
+            await recruitMembers(ns);
+
+            // 2. Check and perform ascensions
+            await checkAscensions(ns, members);
+
+            // 3. Manage equipment for all members
+            await manageEquipment(ns, members);
+
+            // 4. Assign tasks to members
+            await assignTasks(ns, members, territory);
+
+            // 5. Manage territory warfare
+            await manageTerritoryWarfare(ns, territory);
+
+        } catch (error) {
+            ns.print(`ERROR: ${error}`);
+        }
+
+        await ns.sleep(UPDATE_INTERVAL);
+    }
+
+    /**
+     * Recruit new gang members when available
+     */
+    async function recruitMembers(ns) {
+        let recruited = 0;
+        while (ns.gang.canRecruitMember()) {
+            const memberName = generateMemberName(ns.gang.getMemberNames().length);
+            if (ns.gang.recruitMember(memberName)) {
+                ns.print(`✓ Recruited new member: ${memberName}`);
+                recruited++;
+            } else {
+                break;
+            }
+        }
+        if (recruited > 0) {
+            ns.print(`Total recruited this cycle: ${recruited}`);
+        }
+    }
+
+    /**
+     * Generate a unique member name
+     */
+    function generateMemberName(index) {
+        const names = [
+            "Ghost", "Shadow", "Viper", "Reaper", "Blade", "Spike", "Rex",
+            "Phoenix", "Raven", "Wolf", "Cobra", "Havoc", "Zero", "Ace",
+            "Duke", "Hammer", "Steel", "Bullet", "Venom", "Razor", "Storm",
+            "Knight", "Titan", "Frost", "Blaze", "Talon", "Fang", "Claw"
+        ];
+
+        if (index < names.length) {
+            return names[index];
+        }
+        return `Member${index}`;
+    }
+
+    /**
+     * Check and ascend members if their ascension bonus would double their current multipliers
+     */
+    async function checkAscensions(ns, members) {
+        for (const member of members) {
+            const ascensionResult = ns.gang.getAscensionResult(member);
+
+            if (!ascensionResult) continue; // Can't ascend yet
+
+            // Check if any multiplier would be >= 2x (doubled)
+            const shouldAscend =
+                ascensionResult.str >= ASCENSION_MULTIPLIER_THRESHOLD ||
+                ascensionResult.def >= ASCENSION_MULTIPLIER_THRESHOLD ||
+                ascensionResult.dex >= ASCENSION_MULTIPLIER_THRESHOLD ||
+                ascensionResult.agi >= ASCENSION_MULTIPLIER_THRESHOLD ||
+                ascensionResult.cha >= ASCENSION_MULTIPLIER_THRESHOLD;
+
+            if (shouldAscend) {
+                ns.gang.ascendMember(member);
+                ns.print(`⬆ ASCENDED ${member}`);
+                ns.print(`  STR: ${ascensionResult.str.toFixed(2)}x, DEF: ${ascensionResult.def.toFixed(2)}x`);
+                ns.print(`  DEX: ${ascensionResult.dex.toFixed(2)}x, AGI: ${ascensionResult.agi.toFixed(2)}x`);
+                ns.print(`  CHA: ${ascensionResult.cha.toFixed(2)}x`);
+            }
+        }
+    }
+
+    /**
+     * Purchase equipment for gang members
+     */
+    async function manageEquipment(ns, members) {
+        const allEquipment = ns.gang.getEquipmentNames();
+        let purchasesMade = 0;
+
+        for (const member of members) {
+            const memberInfo = ns.gang.getMemberInformation(member);
+
+            for (const equipment of allEquipment) {
+                // Skip if member already has this equipment
+                if (memberInfo.upgrades.includes(equipment) ||
+                    memberInfo.augmentations.includes(equipment)) {
+                    continue;
+                }
+
+                const cost = ns.gang.getEquipmentCost(equipment);
+
+                // Only buy if we can afford it and have enough money left over
+                if (ns.getServerMoneyAvailable("home") > cost * 2) {
+                    if (ns.gang.purchaseEquipment(member, equipment)) {
+                        ns.print(`💰 Bought ${equipment} for ${member} ($${ns.formatNumber(cost)})`);
+                        purchasesMade++;
+                        await ns.sleep(EQUIPMENT_PURCHASE_DELAY);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Assign tasks to gang members based on their stats and current territory
+     */
+    async function assignTasks(ns, members, territory) {
+        const fullyControlled = territory >= 0.999; // 100% territory (account for floating point)
+
+        for (const member of members) {
+            const memberInfo = ns.gang.getMemberInformation(member);
+            const avgCombatStats = (memberInfo.str + memberInfo.def +
+                                   memberInfo.dex + memberInfo.agi) / 4;
+
+            let newTask;
+
+            if (fullyControlled) {
+                // 100% territory - everyone does arms trafficking
+                newTask = TASKS.TRAFFIC_ARMS;
+            } else {
+                // Not 100% territory yet
+                if (avgCombatStats < TRAINING_STATS_THRESHOLD) {
+                    // Low stats - train combat
+                    newTask = TASKS.TRAIN_COMBAT;
+                } else if (avgCombatStats < TERRITORY_WAR_STATS_THRESHOLD) {
+                    // Medium stats - continue training combat
+                    newTask = TASKS.TRAIN_COMBAT;
+                } else {
+                    // High stats - territory warfare
+                    newTask = TASKS.TERRITORY_WARFARE;
+                }
+            }
+
+            // Only change task if it's different
+            if (memberInfo.task !== newTask) {
+                ns.gang.setMemberTask(member, newTask);
+                ns.print(`📋 ${member}: ${memberInfo.task} → ${newTask}`);
+            }
+        }
+    }
+
+    /**
+     * Manage territory warfare - enable clashes when win chance is high enough
+     */
+    async function manageTerritoryWarfare(ns, currentTerritory) {
+        const gangInfo = ns.gang.getGangInformation();
+
+        // If we have 100% territory, disable warfare
+        if (currentTerritory >= 0.999) {
+            if (gangInfo.territoryWarfareEngaged) {
+                ns.gang.setTerritoryWarfare(false);
+                ns.print("🏁 100% territory achieved! Disabling warfare.");
+            }
+            return;
+        }
+
+        // Get all other gangs
+        const otherGangs = [
+            "Slum Snakes", "Tetrads", "The Syndicate",
+            "The Dark Army", "Speakers for the Dead", "NiteSec", "The Black Hand"
+        ].filter(gang => gang !== gangInfo.faction);
+
+        // Calculate minimum win chance against all gangs
+        let minWinChance = 1.0;
+        let worstEnemy = "";
+
+        for (const otherGang of otherGangs) {
+            const otherGangInfo = ns.gang.getOtherGangInformation()[otherGang];
+            if (otherGangInfo && otherGangInfo.territory > 0) {
+                const winChance = ns.gang.getChanceToWinClash(otherGang);
+                if (winChance < minWinChance) {
+                    minWinChance = winChance;
+                    worstEnemy = otherGang;
+                }
+            }
+        }
+
+        ns.print(`⚔️  Territory Warfare: ${gangInfo.territoryWarfareEngaged ? "ENABLED" : "DISABLED"}`);
+        ns.print(`   Worst matchup: ${worstEnemy} (${(minWinChance * 100).toFixed(1)}% win chance)`);
+
+        // Enable clashes if win chance is high enough, disable otherwise
+        const shouldEngage = minWinChance >= TERRITORY_CLASH_WIN_THRESHOLD;
+
+        if (shouldEngage && !gangInfo.territoryWarfareEngaged) {
+            ns.gang.setTerritoryWarfare(true);
+            ns.print(`✓ ENABLED territory clashes (${(minWinChance * 100).toFixed(1)}% win rate)`);
+        } else if (!shouldEngage && gangInfo.territoryWarfareEngaged) {
+            ns.gang.setTerritoryWarfare(false);
+            ns.print(`✗ DISABLED territory clashes (${(minWinChance * 100).toFixed(1)}% win rate too low)`);
+        }
+    }
+}
