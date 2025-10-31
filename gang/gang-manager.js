@@ -211,9 +211,29 @@ export async function main(ns) {
         // Sort by combat stats (highest first) for warfare assignment
         const sortedByStats = [...memberInfos].sort((a, b) => b.avgCombatStats - a.avgCombatStats);
 
-        // Track warfare assignments
+        // Find trained member with lowest respect to keep on terrorism (spreads respect before ascension)
+        const trainedMembers = memberInfos.filter(m => m.avgCombatStats >= TRAINING_STATS_THRESHOLD);
+        const lowestRespectMember = trainedMembers.length > 0
+            ? trainedMembers.reduce((lowest, current) =>
+                current.info.earnedRespect < lowest.info.earnedRespect ? current : lowest
+              ).name
+            : null;
+
+        // Track assignments
         let warfareAssigned = 0;
-        let vigilanteNeeded = highWantedPenalty;
+        let vigilanteAssigned = 0;
+
+        // Always keep lowest-respect member on terrorism to spread respect before ascension
+        if (lowestRespectMember) {
+            ns.print(`📊 Lowest respect: ${lowestRespectMember} → stays on terrorism`);
+        }
+
+        // When wanted penalty is high, it negates ALL gang gains
+        // Priority: get penalty under control ASAP by assigning all trained members to vigilante
+        if (highWantedPenalty) {
+            ns.print(`⚠️  HIGH WANTED PENALTY: ${wantedPenalty.toFixed(2)}% (negates all gains!)`);
+            ns.print(`   PRIORITY: All trained members on vigilante justice (except terrorism member)`);
+        }
 
         for (const memberData of memberInfos) {
             const { name, info, avgCombatStats } = memberData;
@@ -222,11 +242,14 @@ export async function main(ns) {
             if (fullyControlled) {
                 // 100% territory - everyone does arms trafficking
                 newTask = TASKS.TRAFFIC_ARMS;
-            } else if (highWantedPenalty && vigilanteNeeded && avgCombatStats >= TRAINING_STATS_THRESHOLD) {
-                // High wanted penalty (bad) - assign one trained member to vigilante justice
+            } else if (name === lowestRespectMember && avgCombatStats >= TRAINING_STATS_THRESHOLD) {
+                // ALWAYS: Keep lowest-respect member on terrorism to spread respect gains
+                newTask = TASKS.TERRORISM;
+            } else if (highWantedPenalty && avgCombatStats >= TRAINING_STATS_THRESHOLD) {
+                // HIGH PRIORITY: Wanted penalty negates all gains
+                // All other trained members do vigilante justice
                 newTask = TASKS.VIGILANTE_JUSTICE;
-                vigilanteNeeded = false; // Only need one member on vigilante
-                ns.print(`⚠️  High wanted penalty detected (${wantedPenalty.toFixed(2)}%)`);
+                vigilanteAssigned++;
             } else if (avgCombatStats < TRAINING_STATS_THRESHOLD) {
                 // Low stats - train combat first
                 newTask = TASKS.TRAIN_COMBAT;
@@ -248,6 +271,13 @@ export async function main(ns) {
                     // Lower-stat members or extras do arms trafficking for income
                     newTask = TASKS.TRAFFIC_ARMS;
                 }
+            }
+
+            // Log vigilante assignments when in high penalty mode
+            if (highWantedPenalty && newTask === TASKS.VIGILANTE_JUSTICE && vigilanteAssigned === 1) {
+                ns.print(`   → ${vigilanteAssigned} trained member${vigilanteAssigned !== 1 ? 's' : ''} on vigilante duty`);
+            } else if (highWantedPenalty && newTask === TASKS.VIGILANTE_JUSTICE && vigilanteAssigned > 1 && vigilanteAssigned % 3 === 0) {
+                ns.print(`   → ${vigilanteAssigned} trained members on vigilante duty...`);
             }
 
             // Only change task if it's different
