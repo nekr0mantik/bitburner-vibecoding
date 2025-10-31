@@ -158,13 +158,13 @@ export async function main(ns) {
         const division = ns.corporation.getDivision(AGRICULTURE);
         const divisionCities = division.cities || [];
 
-        // Expand to all cities
+        // Expand to all cities (one at a time)
         for (const city of CITIES) {
             if (!divisionCities.includes(city)) {
                 try {
                     ns.corporation.expandCity(AGRICULTURE, city);
                     ns.print(`✓ Expanded to ${city}`);
-                    return; // One at a time
+                    return; // One at a time, let it initialize
                 } catch (e) {
                     ns.print(`⏳ Can't afford expansion to ${city} yet`);
                     return;
@@ -172,9 +172,27 @@ export async function main(ns) {
             }
         }
 
-        // All cities expanded, now hire employees
+        // All cities expanded, now set up each one
         for (const city of CITIES) {
-            const office = ns.corporation.getOffice(AGRICULTURE, city);
+            // Check if office has size 3
+            let office;
+            try {
+                office = ns.corporation.getOffice(AGRICULTURE, city);
+            } catch (e) {
+                ns.print(`⏳ Office not ready in ${city}`);
+                return;
+            }
+
+            if (office.size < 3) {
+                try {
+                    ns.corporation.upgradeOfficeSize(AGRICULTURE, city, 3);
+                    ns.print(`✓ Upgraded office size to 3 in ${city}`);
+                    return; // One upgrade at a time
+                } catch (e) {
+                    ns.print(`⏳ Can't afford office size upgrade in ${city}`);
+                    return;
+                }
+            }
 
             // Buy warehouse if needed
             let hasWarehouse = true;
@@ -188,6 +206,7 @@ export async function main(ns) {
                 try {
                     ns.corporation.purchaseWarehouse(AGRICULTURE, city);
                     ns.print(`✓ Purchased warehouse in ${city}`);
+                    return; // One at a time
                 } catch (e) {
                     ns.print(`⏳ Can't afford warehouse in ${city}`);
                     return;
@@ -201,6 +220,7 @@ export async function main(ns) {
                     const neededLevels = Math.ceil((300 - warehouse.size) / 100);
                     ns.corporation.upgradeWarehouse(AGRICULTURE, city, neededLevels);
                     ns.print(`✓ Upgraded warehouse in ${city} to 300`);
+                    return; // One at a time
                 } catch (e) {
                     ns.print(`⏳ Can't afford warehouse upgrade in ${city}`);
                     return;
@@ -208,21 +228,21 @@ export async function main(ns) {
             }
 
             // Hire 3 employees
-            while (office.size >= 3) {
-                const currentOffice = ns.corporation.getOffice(AGRICULTURE, city);
-                const employees = currentOffice.employees || [];
-                if (employees.length >= 3) break;
-
+            const currentOffice = ns.corporation.getOffice(AGRICULTURE, city);
+            const employees = currentOffice.employees || [];
+            if (employees.length < 3) {
                 try {
                     ns.corporation.hireEmployee(AGRICULTURE, city);
+                    ns.print(`✓ Hired employee in ${city} (${employees.length + 1}/3)`);
+                    return; // One at a time
                 } catch (e) {
-                    break;
+                    ns.print(`⏳ Can't hire in ${city}`);
+                    return;
                 }
             }
 
             // Assign employees: Operations, Engineer, Business
-            const finalOffice = ns.corporation.getOffice(AGRICULTURE, city);
-            if ((finalOffice.employees || []).length >= 3) {
+            if (employees.length >= 3) {
                 try {
                     ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Operations", 1);
                     ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Engineer", 1);
