@@ -211,6 +211,7 @@ export async function main(ns) {
         }
 
         const warehouse = ns.corporation.getWarehouse(divisionName, city);
+        const division = ns.corporation.getDivision(divisionName);
 
         // Log warehouse status for Agriculture
         if (division.type === "Agriculture") {
@@ -242,7 +243,6 @@ export async function main(ns) {
         }
 
         // Manage materials for Agriculture
-        const division = ns.corporation.getDivision(divisionName);
         if (division.type === "Agriculture") {
             // Check if Smart Supply is unlocked
             const hasSmartSupply = ns.corporation.hasUnlockUpgrade("Smart Supply");
