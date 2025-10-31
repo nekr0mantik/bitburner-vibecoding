@@ -47,12 +47,12 @@ export async function main(ns) {
             ns.print(`Revenue: $${ns.formatNumber(corp.revenue)}/s`);
             ns.print(`Expenses: $${ns.formatNumber(corp.expenses)}/s`);
             ns.print(`Profit: $${ns.formatNumber(corp.revenue - corp.expenses)}/s`);
-            ns.print(`Divisions: ${corp.divisions.length}`);
+            ns.print(`Divisions: ${(corp.divisions || []).length}`);
             ns.print(`State: ${corp.state}`);
             ns.print("");
 
             // Manage each division
-            for (const divisionName of corp.divisions) {
+            for (const divisionName of (corp.divisions || [])) {
                 await manageDivision(ns, divisionName, config, corp);
             }
 
@@ -77,14 +77,14 @@ export async function main(ns) {
 
         ns.print(`=== ${divisionName} Division ===`);
         ns.print(`Type: ${division.type}`);
-        ns.print(`Cities: ${division.cities.length}`);
+        ns.print(`Cities: ${(division.cities || []).length}`);
         ns.print("");
 
         // Expand to all cities if not already
         await expandToAllCities(ns, divisionName, config.cities);
 
         // Manage each city
-        for (const city of division.cities) {
+        for (const city of (division.cities || [])) {
             await manageCity(ns, divisionName, city, corp);
         }
     }
@@ -94,9 +94,10 @@ export async function main(ns) {
      */
     async function expandToAllCities(ns, divisionName, cities) {
         const division = ns.corporation.getDivision(divisionName);
+        const divisionCities = division.cities || [];
 
         for (const city of cities) {
-            if (!division.cities.includes(city)) {
+            if (!divisionCities.includes(city)) {
                 try {
                     ns.corporation.expandCity(divisionName, city);
                     ns.print(`✓ Expanded ${divisionName} to ${city}`);
@@ -127,11 +128,15 @@ export async function main(ns) {
         }
 
         // Hire employees to fill all positions
-        while (office.employees.length < office.size) {
+        let currentEmployees = office.employees || [];
+        while (currentEmployees.length < office.size) {
             try {
                 const employee = ns.corporation.hireEmployee(divisionName, city);
                 if (employee) {
                     ns.print(`✓ Hired employee in ${city}`);
+                    // Refresh office data
+                    const updatedOffice = ns.corporation.getOffice(divisionName, city);
+                    currentEmployees = updatedOffice.employees || [];
                 } else {
                     break;
                 }
@@ -151,7 +156,8 @@ export async function main(ns) {
      * Assign employees to positions based on ratios
      */
     async function assignEmployees(ns, divisionName, city, office) {
-        const totalEmployees = office.employees.length;
+        const employees = office.employees || [];
+        const totalEmployees = employees.length;
         if (totalEmployees === 0) return;
 
         // Calculate target counts for each position
