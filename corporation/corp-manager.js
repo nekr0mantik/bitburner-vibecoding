@@ -6,7 +6,6 @@ export async function main(ns) {
     const TARGET_OFFICE_SIZE = 30; // Expand to 30 employees per office
     const INITIAL_WAREHOUSE_SIZE = 300; // Initial warehouse size
     const TARGET_WAREHOUSE_SIZE = 3800; // Target warehouse size
-    const SMART_SUPPLY_ENABLED = true;
 
     // Employee assignment ratios for Agriculture
     const EMPLOYEE_RATIOS = {
@@ -51,17 +50,31 @@ export async function main(ns) {
             ns.print(`State: ${corp.state}`);
             ns.print("");
 
-            // Manage each division
-            for (const divisionName of (corp.divisions || [])) {
-                await manageDivision(ns, divisionName, config, corp);
+            // FIRST PRIORITY: Unlock Smart Supply before doing anything else
+            await unlockSmartSupply(ns, corp);
+
+            // Only manage divisions if Smart Supply is unlocked
+            const hasSmartSupply = ns.corporation.hasUnlock("Smart Supply");
+            if (hasSmartSupply) {
+                // Manage each division
+                for (const divisionName of (corp.divisions || [])) {
+                    await manageDivision(ns, divisionName, config, corp);
+                }
+
+                // Try to accept investment if needed
+                await manageInvestment(ns, corp);
+
+                // Purchase other upgrades
+                await unlockOtherUpgrades(ns, corp);
+                await purchaseUpgrades(ns, corp);
+            } else {
+                ns.print("");
+                ns.print("⚠️  WAITING FOR SMART SUPPLY UNLOCK");
+                ns.print("   Smart Supply is required before operations can begin.");
+                const cost = ns.corporation.getUnlockUpgradeCost("Smart Supply");
+                ns.print(`   Cost: $${ns.formatNumber(cost)}`);
+                ns.print(`   Current funds: $${ns.formatNumber(corp.funds)}`);
             }
-
-            // Try to accept investment if needed
-            await manageInvestment(ns, corp);
-
-            // Unlock and purchase corporation upgrades
-            await unlockPriorityUpgrades(ns, corp);
-            await purchaseUpgrades(ns, corp);
 
         } catch (error) {
             ns.print(`ERROR: ${error}`);
@@ -242,38 +255,17 @@ export async function main(ns) {
             }
         }
 
-        // Manage materials for Agriculture
+        // Manage materials for Agriculture (Smart Supply must be unlocked to reach here)
         if (division.type === "Agriculture") {
-            // Check if Smart Supply is unlocked
-            const hasSmartSupply = ns.corporation.hasUnlock("Smart Supply");
-
-            if (hasSmartSupply && SMART_SUPPLY_ENABLED) {
-                // Use Smart Supply for automatic material management
-                try {
-                    ns.corporation.setSmartSupply(divisionName, city, true);
-                    ns.corporation.setSmartSupplyUseLeftovers(divisionName, city, true);
-                    ns.print(`  ${city}: Smart Supply ENABLED`);
-                } catch (e) {
-                    ns.print(`  ${city}: Failed to enable Smart Supply`);
-                }
-            } else {
-                // Manually manage materials if Smart Supply not available
-                try {
-                    if (!hasSmartSupply) {
-                        ns.print(`  ${city}: Smart Supply not unlocked - manual mode`);
-                    }
-                    // Buy materials needed for production (per second rates)
-                    ns.corporation.buyMaterial(divisionName, city, "Water", 500);
-                    ns.corporation.buyMaterial(divisionName, city, "Energy", 500);
-                    ns.corporation.buyMaterial(divisionName, city, "Hardware", 125);
-                    ns.corporation.buyMaterial(divisionName, city, "AI Cores", 75);
-                    ns.corporation.buyMaterial(divisionName, city, "Real Estate", 27000);
-                } catch (e) {
-                    ns.print(`  ${city}: Material purchasing failed: ${e}`);
-                }
+            // Enable Smart Supply for automatic material management
+            try {
+                ns.corporation.setSmartSupply(divisionName, city, true);
+                ns.corporation.setSmartSupplyUseLeftovers(divisionName, city, true);
+            } catch (e) {
+                // Smart Supply might already be enabled
             }
 
-            // Always set up selling for output materials
+            // Set up selling for output materials
             try {
                 ns.corporation.sellMaterial(divisionName, city, "Plants", "MAX", "MP");
                 ns.corporation.sellMaterial(divisionName, city, "Food", "MAX", "MP");
@@ -306,27 +298,44 @@ export async function main(ns) {
     }
 
     /**
-     * Unlock priority one-time upgrades
+     * Unlock Smart Supply - HIGHEST PRIORITY
      */
-    async function unlockPriorityUpgrades(ns, corp) {
-        // Priority unlocks in order of importance
-        const priorityUnlocks = [
-            "Smart Supply",      // Essential for automatic material purchasing
+    async function unlockSmartSupply(ns, corp) {
+        const upgradeName = "Smart Supply";
+        try {
+            const hasUnlock = ns.corporation.hasUnlock(upgradeName);
+            if (!hasUnlock) {
+                const cost = ns.corporation.getUnlockUpgradeCost(upgradeName);
+                if (corp.funds >= cost) {
+                    ns.corporation.unlockUpgrade(upgradeName);
+                    ns.print(`✓✓✓ UNLOCKED ${upgradeName} (Cost: $${ns.formatNumber(cost)}) ✓✓✓`);
+                    ns.print("");
+                }
+            }
+        } catch (e) {
+            ns.print(`ERROR unlocking Smart Supply: ${e}`);
+        }
+    }
+
+    /**
+     * Unlock other useful one-time upgrades
+     */
+    async function unlockOtherUpgrades(ns, corp) {
+        // Other useful unlocks
+        const otherUnlocks = [
             "Warehouse API",     // Allows warehouse management
             "Office API",        // Allows office management
             "Export"            // Allows exporting materials between divisions
         ];
 
-        for (const unlockName of priorityUnlocks) {
+        for (const unlockName of otherUnlocks) {
             try {
                 const hasUnlock = ns.corporation.hasUnlock(unlockName);
                 if (!hasUnlock) {
                     const cost = ns.corporation.getUnlockUpgradeCost(unlockName);
-                    if (corp.funds > cost * 2) { // Only buy if we have 2x the cost
+                    if (corp.funds > cost * 10) { // Only buy if we have 10x the cost
                         ns.corporation.unlockUpgrade(unlockName);
                         ns.print(`✓ Unlocked ${unlockName} (Cost: $${ns.formatNumber(cost)})`);
-                    } else {
-                        ns.print(`⏳ Need $${ns.formatNumber(cost)} to unlock ${unlockName}`);
                     }
                 }
             } catch (e) {
