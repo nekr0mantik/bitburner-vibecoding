@@ -4,6 +4,8 @@ export async function main(ns) {
     const MAX_GANG_MEMBERS = 12; // Hard cap in Bitburner
     const ASCENSION_MULTIPLIER_THRESHOLD = 2.0; // Ascend when new multiplier is 2x current
     const TERRITORY_CLASH_WIN_THRESHOLD = 0.95; // Enable clashes at 95% win chance
+    const WANTED_PENALTY_THRESHOLD = 0.01; // Do vigilante work if wanted penalty > 1%
+    const WARFARE_MEMBERS_COUNT = 6; // Number of members to assign to territory warfare
     const EQUIPMENT_PURCHASE_DELAY = 100; // ms between equipment purchases
     const TRAINING_STATS_THRESHOLD = 100; // Train until stats reach this level
     const TERRITORY_WAR_STATS_THRESHOLD = 300; // Switch to territory war after this
@@ -15,6 +17,7 @@ export async function main(ns) {
         TRAIN_HACKING: "Train Hacking",
         TRAIN_CHARISMA: "Train Charisma",
         TERRORISM: "Terrorism",
+        VIGILANTE_JUSTICE: "Vigilante Justice",
         TERRITORY_WARFARE: "Territory Warfare",
         TRAFFIC_ARMS: "Traffick Illegal Arms",
         UNASSIGNED: "Unassigned"
@@ -48,6 +51,7 @@ export async function main(ns) {
             ns.print(`Territory: ${(territory * 100).toFixed(2)}%`);
             ns.print(`Respect: ${ns.formatNumber(gangInfo.respect)}`);
             ns.print(`Wanted Level: ${ns.formatNumber(gangInfo.wantedLevel)}`);
+            ns.print(`Wanted Penalty: ${(gangInfo.wantedPenalty * 100).toFixed(2)}%`);
             ns.print("");
 
             // 1. Recruit new members
@@ -167,22 +171,43 @@ export async function main(ns) {
     }
 
     /**
-     * Assign tasks to gang members based on their stats, member count, and current territory
+     * Assign tasks to gang members based on their stats, member count, wanted penalty, and current territory
      */
     async function assignTasks(ns, members, territory) {
+        const gangInfo = ns.gang.getGangInformation();
         const fullyControlled = territory >= 0.999; // 100% territory (account for floating point)
         const maxMembers = members.length >= MAX_GANG_MEMBERS;
+        const highWantedPenalty = gangInfo.wantedPenalty > WANTED_PENALTY_THRESHOLD;
 
-        for (const member of members) {
-            const memberInfo = ns.gang.getMemberInformation(member);
-            const avgCombatStats = (memberInfo.str + memberInfo.def +
-                                   memberInfo.dex + memberInfo.agi) / 4;
+        // Get member info with combat stats
+        const memberInfos = members.map(name => {
+            const info = ns.gang.getMemberInformation(name);
+            return {
+                name: name,
+                info: info,
+                avgCombatStats: (info.str + info.def + info.dex + info.agi) / 4
+            };
+        });
 
+        // Sort by combat stats (highest first) for warfare assignment
+        const sortedByStats = [...memberInfos].sort((a, b) => b.avgCombatStats - a.avgCombatStats);
+
+        // Track warfare assignments
+        let warfareAssigned = 0;
+        let vigilanteNeeded = highWantedPenalty;
+
+        for (const memberData of memberInfos) {
+            const { name, info, avgCombatStats } = memberData;
             let newTask;
 
             if (fullyControlled) {
                 // 100% territory - everyone does arms trafficking
                 newTask = TASKS.TRAFFIC_ARMS;
+            } else if (highWantedPenalty && vigilanteNeeded && avgCombatStats >= TRAINING_STATS_THRESHOLD) {
+                // High wanted penalty - assign some trained members to vigilante justice
+                newTask = TASKS.VIGILANTE_JUSTICE;
+                vigilanteNeeded = false; // Only need one member on vigilante
+                ns.print(`⚠️  High wanted penalty detected (${(gangInfo.wantedPenalty * 100).toFixed(2)}%)`);
             } else if (avgCombatStats < TRAINING_STATS_THRESHOLD) {
                 // Low stats - train combat first
                 newTask = TASKS.TRAIN_COMBAT;
@@ -193,14 +218,23 @@ export async function main(ns) {
                 // Have max members but medium stats - continue training
                 newTask = TASKS.TRAIN_COMBAT;
             } else {
-                // High stats and max members - territory warfare
-                newTask = TASKS.TERRITORY_WARFARE;
+                // High stats and max members - ready for warfare phase
+                // Only top 6 members do territory warfare, rest do arms trafficking
+                const isTopWarrior = sortedByStats.slice(0, WARFARE_MEMBERS_COUNT).some(m => m.name === name);
+
+                if (isTopWarrior && warfareAssigned < WARFARE_MEMBERS_COUNT) {
+                    newTask = TASKS.TERRITORY_WARFARE;
+                    warfareAssigned++;
+                } else {
+                    // Lower-stat members or extras do arms trafficking for income
+                    newTask = TASKS.TRAFFIC_ARMS;
+                }
             }
 
             // Only change task if it's different
-            if (memberInfo.task !== newTask) {
-                ns.gang.setMemberTask(member, newTask);
-                ns.print(`📋 ${member}: ${memberInfo.task} → ${newTask}`);
+            if (info.task !== newTask) {
+                ns.gang.setMemberTask(name, newTask);
+                ns.print(`📋 ${name}: ${info.task} → ${newTask}`);
             }
         }
     }

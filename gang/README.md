@@ -7,8 +7,10 @@ An automated gang management script for the game Bitburner that handles all aspe
 - **Automatic Recruitment**: Recruits new gang members whenever available
 - **Smart Training**: Trains new members in combat skills until they reach effective stat levels
 - **Respect Farming**: Uses terrorism to rapidly gain respect for faster recruitment
+- **Wanted Level Management**: Automatically assigns vigilante justice when wanted penalty exceeds 1%
 - **Equipment Management**: Automatically purchases all available equipment for gang members
-- **Territory Warfare**: Manages territory warfare with intelligent clash engagement
+- **Optimized Warfare**: Only top 6 members fight in territory warfare, rest earn money trafficking arms
+- **Territory Warfare**: Manages territory warfare with intelligent clash engagement (95% win threshold)
 - **Ascension Management**: Ascends members when their bonuses would double (2x multiplier)
 - **Optimized Money Making**: Switches to arms trafficking after 100% territory control
 
@@ -44,8 +46,10 @@ An automated gang management script for the game Bitburner that handles all aspe
 - Continues equipment upgrades
 
 ### Phase 4: Territory Warfare (Stats 300+ → 100% Territory)
-- Assigns trained members to territory warfare
+- Assigns top 6 members (by combat stats) to territory warfare
+- Remaining 6 members traffic illegal arms to earn money
 - Enables clashes only when win chance is ≥95%
+- Automatically manages wanted level with vigilante justice (if penalty > 1%)
 - Ascends members when their bonuses would double
 - Goal: Achieve 100% territory control
 
@@ -62,6 +66,8 @@ You can modify these constants at the top of the script to adjust behavior:
 ```javascript
 const ASCENSION_MULTIPLIER_THRESHOLD = 2.0;  // Ascend when new multiplier is 2x current
 const TERRITORY_CLASH_WIN_THRESHOLD = 0.95;  // Enable clashes at 95% win chance
+const WANTED_PENALTY_THRESHOLD = 0.01;       // Do vigilante work if wanted penalty > 1%
+const WARFARE_MEMBERS_COUNT = 6;             // Number of members to assign to territory warfare
 const TRAINING_STATS_THRESHOLD = 100;        // Train until stats reach this level
 const TERRITORY_WAR_STATS_THRESHOLD = 300;   // Switch to territory war after this
 const UPDATE_INTERVAL = 10000;               // 10 seconds between updates
@@ -80,6 +86,7 @@ The script shows real-time information:
 - Number of members
 - Territory percentage
 - Respect and wanted level
+- Wanted penalty percentage (vigilante justice triggers if > 1%)
 - Member task assignments
 - Equipment purchases
 - Ascensions performed
@@ -89,9 +96,12 @@ The script shows real-time information:
 
 - The script is designed to run continuously - don't stop it unless necessary
 - It automatically manages money spending on equipment while keeping reserves
-- Territory warfare is only engaged when you have a strong advantage
-- Arms trafficking becomes available after 100% territory and provides the best income
-- Ascension timing is optimized to maximize long-term stat growth
+- Only the top 6 members (by combat stats) fight in territory warfare for efficiency
+- The other 6 members earn money through arms trafficking during warfare phase
+- Wanted level penalty is automatically managed - vigilante justice activates if it exceeds 1%
+- Territory warfare clashes are only engaged when you have ≥95% win chance
+- Arms trafficking scales with territory controlled, maximizing income at 100%
+- Ascension timing is optimized to maximize long-term stat growth (2x multiplier threshold)
 
 ## Author
 
