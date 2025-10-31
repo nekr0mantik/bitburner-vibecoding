@@ -238,16 +238,12 @@ export async function main(ns) {
             const positions = ["Operations", "Engineer", "Business"];
             if (employeeCount < 3) {
                 const position = positions[employeeCount];
-                try {
-                    const hired = ns.corporation.hireEmployee(AGRICULTURE, city, position);
-                    if (hired) {
-                        ns.print(`✓ Hired ${position} in ${city} (${employeeCount + 1}/3)`);
-                    } else {
-                        ns.print(`⏳ Failed to hire ${position} in ${city}`);
-                    }
+                const hired = ns.corporation.hireEmployee(AGRICULTURE, city, position);
+                if (hired) {
+                    ns.print(`✓ Hired ${position} in ${city} (${employeeCount + 1}/3)`);
                     return; // One at a time
-                } catch (e) {
-                    ns.print(`⏳ Can't hire in ${city}: ${e}`);
+                } else {
+                    ns.print(`⏳ Failed to hire ${position} in ${city} (may need funds or office space)`);
                     return;
                 }
             }
@@ -419,14 +415,12 @@ export async function main(ns) {
                     ];
                     const position = positions[employeeCount];
 
-                    try {
-                        const hired = ns.corporation.hireEmployee(AGRICULTURE, city, position);
-                        if (hired) {
-                            ns.print(`✓ Hired ${position} in ${city} (${employeeCount + 1}/9)`);
-                        }
+                    const hired = ns.corporation.hireEmployee(AGRICULTURE, city, position);
+                    if (hired) {
+                        ns.print(`✓ Hired ${position} in ${city} (${employeeCount + 1}/9)`);
                         return; // One at a time
-                    } catch (e) {
-                        ns.print(`⏳ Can't hire ${position} in ${city}: ${e}`);
+                    } else {
+                        ns.print(`⏳ Failed to hire ${position} in ${city}`);
                         return;
                     }
                 }
