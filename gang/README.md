@@ -46,18 +46,12 @@ An automated gang management script for the game Bitburner that handles all aspe
 - Continues equipment upgrades
 
 ### Phase 4: Territory Warfare (Stats 300+ → 100% Territory)
-
-**Waiting for Safe Clash Conditions** (Win chance < 95%):
-- All members commit terrorism to build respect and power
-- Script monitors win chance against all other gangs
-- Continues equipment upgrades and ascensions
-- Automatically manages wanted level with vigilante justice (if penalty > 1%)
-
-**Active Warfare** (Win chance ≥ 95%, clashes enabled):
-- Top 6 members (by combat stats) engage in territory warfare
+- Top 6 members (by combat stats) engage in territory warfare to build power
 - Remaining 6 members traffic illegal arms to earn money
-- Clashes automatically enabled when win chance reaches 95%
-- Continues ascensions and wanted level management
+- Territory clashes automatically enabled when win chance reaches 95%
+- Clashes disabled if win chance drops below 95%
+- Automatically manages wanted level with vigilante justice (if penalty drops below 99%)
+- Ascends members when their bonuses would double
 - Goal: Achieve 100% territory control
 
 ### Phase 5: Money Making (100% Territory)
@@ -73,7 +67,7 @@ You can modify these constants at the top of the script to adjust behavior:
 ```javascript
 const ASCENSION_MULTIPLIER_THRESHOLD = 2.0;  // Ascend when new multiplier is 2x current
 const TERRITORY_CLASH_WIN_THRESHOLD = 0.95;  // Enable clashes at 95% win chance
-const WANTED_PENALTY_THRESHOLD = 0.01;       // Do vigilante work if wanted penalty > 1%
+const WANTED_PENALTY_THRESHOLD = 0.99;       // Do vigilante work if wanted penalty drops below 99%
 const WARFARE_MEMBERS_COUNT = 6;             // Number of members to assign to territory warfare
 const TRAINING_STATS_THRESHOLD = 100;        // Train until stats reach this level
 const TERRITORY_WAR_STATS_THRESHOLD = 300;   // Switch to territory war after this
@@ -93,7 +87,7 @@ The script shows real-time information:
 - Number of members
 - Territory percentage
 - Respect and wanted level
-- Wanted penalty percentage (vigilante justice triggers if > 1%)
+- Wanted penalty percentage (100% = no penalty, lower = worse; vigilante justice triggers below 99%)
 - Member task assignments
 - Equipment purchases
 - Ascensions performed
@@ -103,10 +97,10 @@ The script shows real-time information:
 
 - The script is designed to run continuously - don't stop it unless necessary
 - It automatically manages money spending on equipment while keeping reserves
-- Members commit terrorism while waiting for safe clash conditions (< 95% win chance)
-- Once clashes are safe, only the top 6 members (by combat stats) fight in territory warfare
-- The other 6 members earn money through arms trafficking during active warfare
-- Wanted level penalty is automatically managed - vigilante justice activates if it exceeds 1%
+- Top 6 members (by combat stats) do territory warfare to build power for your gang
+- The other 6 members earn money through arms trafficking during warfare phase
+- Territory warfare assignment happens even when clashes are disabled - this builds your gang's power
+- Wanted penalty is inverted: 100% = perfect, 99% = 1% penalty (vigilante justice triggers below 99%)
 - Territory warfare clashes are only engaged when you have ≥95% win chance against all gangs
 - Arms trafficking scales with territory controlled, maximizing income at 100%
 - Ascension timing is optimized to maximize long-term stat growth (2x multiplier threshold)

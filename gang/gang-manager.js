@@ -4,7 +4,7 @@ export async function main(ns) {
     const MAX_GANG_MEMBERS = 12; // Hard cap in Bitburner
     const ASCENSION_MULTIPLIER_THRESHOLD = 2.0; // Ascend when new multiplier is 2x current
     const TERRITORY_CLASH_WIN_THRESHOLD = 0.95; // Enable clashes at 95% win chance
-    const WANTED_PENALTY_THRESHOLD = 0.01; // Do vigilante work if wanted penalty > 1%
+    const WANTED_PENALTY_THRESHOLD = 0.99; // Do vigilante work if wanted penalty drops below 99%
     const WARFARE_MEMBERS_COUNT = 6; // Number of members to assign to territory warfare
     const EQUIPMENT_PURCHASE_DELAY = 100; // ms between equipment purchases
     const TRAINING_STATS_THRESHOLD = 100; // Train until stats reach this level
@@ -177,7 +177,7 @@ export async function main(ns) {
         const gangInfo = ns.gang.getGangInformation();
         const fullyControlled = territory >= 0.999; // 100% territory (account for floating point)
         const maxMembers = members.length >= MAX_GANG_MEMBERS;
-        const highWantedPenalty = gangInfo.wantedPenalty > WANTED_PENALTY_THRESHOLD;
+        const lowWantedPenalty = gangInfo.wantedPenalty < WANTED_PENALTY_THRESHOLD; // Penalty is inverted (lower = worse)
 
         // Get member info with combat stats
         const memberInfos = members.map(name => {
@@ -194,7 +194,7 @@ export async function main(ns) {
 
         // Track warfare assignments
         let warfareAssigned = 0;
-        let vigilanteNeeded = highWantedPenalty;
+        let vigilanteNeeded = lowWantedPenalty;
 
         for (const memberData of memberInfos) {
             const { name, info, avgCombatStats } = memberData;
@@ -203,11 +203,11 @@ export async function main(ns) {
             if (fullyControlled) {
                 // 100% territory - everyone does arms trafficking
                 newTask = TASKS.TRAFFIC_ARMS;
-            } else if (highWantedPenalty && vigilanteNeeded && avgCombatStats >= TRAINING_STATS_THRESHOLD) {
-                // High wanted penalty - assign some trained members to vigilante justice
+            } else if (lowWantedPenalty && vigilanteNeeded && avgCombatStats >= TRAINING_STATS_THRESHOLD) {
+                // Low wanted penalty (bad) - assign one trained member to vigilante justice
                 newTask = TASKS.VIGILANTE_JUSTICE;
                 vigilanteNeeded = false; // Only need one member on vigilante
-                ns.print(`⚠️  High wanted penalty detected (${(gangInfo.wantedPenalty * 100).toFixed(2)}%)`);
+                ns.print(`⚠️  Low wanted penalty detected (${(gangInfo.wantedPenalty * 100).toFixed(2)}%)`);
             } else if (avgCombatStats < TRAINING_STATS_THRESHOLD) {
                 // Low stats - train combat first
                 newTask = TASKS.TRAIN_COMBAT;
@@ -217,12 +217,9 @@ export async function main(ns) {
             } else if (avgCombatStats < TERRITORY_WAR_STATS_THRESHOLD) {
                 // Have max members but medium stats - continue training
                 newTask = TASKS.TRAIN_COMBAT;
-            } else if (!gangInfo.territoryWarfareEngaged) {
-                // High stats but clashes not engaged yet - do terrorism to build respect
-                newTask = TASKS.TERRORISM;
             } else {
-                // High stats, max members, and clashes engaged - warfare phase
-                // Only top 6 members do territory warfare, rest do arms trafficking
+                // High stats and max members - warfare phase
+                // Only top 6 members do territory warfare to build power, rest do arms trafficking
                 const isTopWarrior = sortedByStats.slice(0, WARFARE_MEMBERS_COUNT).some(m => m.name === name);
 
                 if (isTopWarrior && warfareAssigned < WARFARE_MEMBERS_COUNT) {
