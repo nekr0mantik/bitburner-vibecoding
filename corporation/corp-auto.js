@@ -208,8 +208,11 @@ export async function main(ns) {
             }
 
             // Hire 3 employees
-            const employees = office.employees || [];
-            while (employees.length < 3 && office.size >= 3) {
+            while (office.size >= 3) {
+                const currentOffice = ns.corporation.getOffice(AGRICULTURE, city);
+                const employees = currentOffice.employees || [];
+                if (employees.length >= 3) break;
+
                 try {
                     ns.corporation.hireEmployee(AGRICULTURE, city);
                 } catch (e) {
@@ -218,7 +221,8 @@ export async function main(ns) {
             }
 
             // Assign employees: Operations, Engineer, Business
-            if (employees.length >= 3) {
+            const finalOffice = ns.corporation.getOffice(AGRICULTURE, city);
+            if ((finalOffice.employees || []).length >= 3) {
                 try {
                     ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Operations", 1);
                     ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Engineer", 1);
@@ -377,8 +381,11 @@ export async function main(ns) {
                 }
 
                 // Hire up to 9
-                const employees = office.employees || [];
-                while (employees.length < 9) {
+                while (true) {
+                    const currentOffice = ns.corporation.getOffice(AGRICULTURE, city);
+                    const employees = currentOffice.employees || [];
+                    if (employees.length >= 9) break;
+
                     try {
                         ns.corporation.hireEmployee(AGRICULTURE, city);
                     } catch (e) {
@@ -387,7 +394,8 @@ export async function main(ns) {
                 }
 
                 // Assign: Ops(2), Eng(2), Bus(1), Mgmt(2), R&D(2)
-                if (employees.length >= 9) {
+                const finalOffice = ns.corporation.getOffice(AGRICULTURE, city);
+                if ((finalOffice.employees || []).length >= 9) {
                     try {
                         ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Operations", 2);
                         ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Engineer", 2);
