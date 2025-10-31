@@ -32,15 +32,45 @@ run gang/gang-start.js
 
 ---
 
+### Corporation Management
+
+**Location**: `corporation/corp-manager.js`
+
+**Description**: Comprehensive automated corporation management system that handles everything from startup to late game, starting with Agriculture and expanding systematically.
+
+**Features**:
+- Automatic division and city expansion
+- Smart employee hiring and assignment
+- Warehouse and office management
+- Material purchasing and selling automation
+- Investment round acceptance
+- Corporation upgrade purchasing
+- Smart Supply automation
+- RAM optimized (split architecture)
+
+**Usage**:
+```
+run corporation/corp-start.js
+```
+(This will automatically launch the optimized manager)
+
+**Documentation**: [corporation/README.md](corporation/README.md)
+
+---
+
 ## Project Structure
 
 ```
 bitburner-vibecoding/
 ├── README.md                 # This file - main script index
-└── gang/
-    ├── gang-start.js         # Starter script (run this first)
-    ├── gang-manager.js       # Main gang automation script
-    └── README.md             # Detailed gang manager documentation
+├── gang/
+│   ├── gang-start.js         # Starter script (run this first)
+│   ├── gang-manager.js       # Main gang automation script
+│   └── README.md             # Detailed gang manager documentation
+└── corporation/
+    ├── corp-start.js         # Starter script (run this first)
+    ├── corp-manager.js       # Main corporation automation script
+    └── README.md             # Detailed corporation manager documentation
 ```
 
 ## Getting Started
@@ -56,7 +86,7 @@ This repository will be expanded with additional automation scripts for:
 - Hacking automation
 - Server management
 - Stock market trading
-- Corporation management
+- Sleeve management
 - And more...
 
 ## Contributing
