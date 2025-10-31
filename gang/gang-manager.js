@@ -14,6 +14,7 @@ export async function main(ns) {
         TRAIN_COMBAT: "Train Combat",
         TRAIN_HACKING: "Train Hacking",
         TRAIN_CHARISMA: "Train Charisma",
+        TERRORISM: "Terrorism",
         TERRITORY_WARFARE: "Territory Warfare",
         TRAFFIC_ARMS: "Traffick Illegal Arms",
         UNASSIGNED: "Unassigned"
@@ -166,10 +167,11 @@ export async function main(ns) {
     }
 
     /**
-     * Assign tasks to gang members based on their stats and current territory
+     * Assign tasks to gang members based on their stats, member count, and current territory
      */
     async function assignTasks(ns, members, territory) {
         const fullyControlled = territory >= 0.999; // 100% territory (account for floating point)
+        const maxMembers = members.length >= MAX_GANG_MEMBERS;
 
         for (const member of members) {
             const memberInfo = ns.gang.getMemberInformation(member);
@@ -181,18 +183,18 @@ export async function main(ns) {
             if (fullyControlled) {
                 // 100% territory - everyone does arms trafficking
                 newTask = TASKS.TRAFFIC_ARMS;
+            } else if (avgCombatStats < TRAINING_STATS_THRESHOLD) {
+                // Low stats - train combat first
+                newTask = TASKS.TRAIN_COMBAT;
+            } else if (!maxMembers) {
+                // Trained but don't have max members - do terrorism for respect to recruit faster
+                newTask = TASKS.TERRORISM;
+            } else if (avgCombatStats < TERRITORY_WAR_STATS_THRESHOLD) {
+                // Have max members but medium stats - continue training
+                newTask = TASKS.TRAIN_COMBAT;
             } else {
-                // Not 100% territory yet
-                if (avgCombatStats < TRAINING_STATS_THRESHOLD) {
-                    // Low stats - train combat
-                    newTask = TASKS.TRAIN_COMBAT;
-                } else if (avgCombatStats < TERRITORY_WAR_STATS_THRESHOLD) {
-                    // Medium stats - continue training combat
-                    newTask = TASKS.TRAIN_COMBAT;
-                } else {
-                    // High stats - territory warfare
-                    newTask = TASKS.TERRITORY_WARFARE;
-                }
+                // High stats and max members - territory warfare
+                newTask = TASKS.TERRITORY_WARFARE;
             }
 
             // Only change task if it's different

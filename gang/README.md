@@ -6,6 +6,7 @@ An automated gang management script for the game Bitburner that handles all aspe
 
 - **Automatic Recruitment**: Recruits new gang members whenever available
 - **Smart Training**: Trains new members in combat skills until they reach effective stat levels
+- **Respect Farming**: Uses terrorism to rapidly gain respect for faster recruitment
 - **Equipment Management**: Automatically purchases all available equipment for gang members
 - **Territory Warfare**: Manages territory warfare with intelligent clash engagement
 - **Ascension Management**: Ascends members when their bonuses would double (2x multiplier)
@@ -26,18 +27,29 @@ An automated gang management script for the game Bitburner that handles all aspe
 
 ## Strategy
 
-### Phase 1: Training (Start → Stats ~300)
-- Recruits members continuously
+### Phase 1: Initial Training (Start → Stats 100)
+- Recruits members as they become available
 - Trains all members in combat skills
 - Purchases equipment as money becomes available
 
-### Phase 2: Territory Warfare (Stats 300+ → 100% Territory)
+### Phase 2: Respect Farming (Stats 100+ → 12 Members)
+- Trained members commit terrorism to rapidly gain respect
+- Higher respect allows faster recruitment of new members
+- Continues equipment purchases
+- Goal: Reach maximum 12 gang members quickly
+
+### Phase 3: Advanced Training (12 Members, Stats 100-300)
+- All 12 members continue combat training
+- Prepares members for territory warfare
+- Continues equipment upgrades
+
+### Phase 4: Territory Warfare (Stats 300+ → 100% Territory)
 - Assigns trained members to territory warfare
 - Enables clashes only when win chance is ≥95%
-- Continues to recruit and equip new members
 - Ascends members when their bonuses would double
+- Goal: Achieve 100% territory control
 
-### Phase 3: Money Making (100% Territory)
+### Phase 5: Money Making (100% Territory)
 - All members switch to trafficking illegal arms
 - This task scales best with territory controlled
 - Continues ascension management

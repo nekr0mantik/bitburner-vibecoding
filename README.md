@@ -13,6 +13,7 @@ A collection of automation scripts for the game Bitburner to help manage various
 **Features**:
 - Automatic member recruitment
 - Smart training progression
+- Respect farming via terrorism for faster recruitment
 - Equipment purchasing
 - Territory warfare with intelligent clash engagement
 - Ascension management (ascend at 2x multiplier threshold)
