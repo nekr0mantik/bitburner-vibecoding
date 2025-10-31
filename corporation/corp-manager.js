@@ -245,7 +245,7 @@ export async function main(ns) {
         // Manage materials for Agriculture
         if (division.type === "Agriculture") {
             // Check if Smart Supply is unlocked
-            const hasSmartSupply = ns.corporation.hasUnlockUpgrade("Smart Supply");
+            const hasSmartSupply = ns.corporation.hasUnlock("Smart Supply");
 
             if (hasSmartSupply && SMART_SUPPLY_ENABLED) {
                 // Use Smart Supply for automatic material management
@@ -319,7 +319,7 @@ export async function main(ns) {
 
         for (const unlockName of priorityUnlocks) {
             try {
-                const hasUnlock = ns.corporation.hasUnlockUpgrade(unlockName);
+                const hasUnlock = ns.corporation.hasUnlock(unlockName);
                 if (!hasUnlock) {
                     const cost = ns.corporation.getUnlockUpgradeCost(unlockName);
                     if (corp.funds > cost * 2) { // Only buy if we have 2x the cost
