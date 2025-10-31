@@ -217,8 +217,11 @@ export async function main(ns) {
             } else if (avgCombatStats < TERRITORY_WAR_STATS_THRESHOLD) {
                 // Have max members but medium stats - continue training
                 newTask = TASKS.TRAIN_COMBAT;
+            } else if (!gangInfo.territoryWarfareEngaged) {
+                // High stats but clashes not engaged yet - do terrorism to build respect
+                newTask = TASKS.TERRORISM;
             } else {
-                // High stats and max members - ready for warfare phase
+                // High stats, max members, and clashes engaged - warfare phase
                 // Only top 6 members do territory warfare, rest do arms trafficking
                 const isTopWarrior = sortedByStats.slice(0, WARFARE_MEMBERS_COUNT).some(m => m.name === name);
 

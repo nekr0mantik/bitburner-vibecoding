@@ -46,11 +46,18 @@ An automated gang management script for the game Bitburner that handles all aspe
 - Continues equipment upgrades
 
 ### Phase 4: Territory Warfare (Stats 300+ → 100% Territory)
-- Assigns top 6 members (by combat stats) to territory warfare
-- Remaining 6 members traffic illegal arms to earn money
-- Enables clashes only when win chance is ≥95%
+
+**Waiting for Safe Clash Conditions** (Win chance < 95%):
+- All members commit terrorism to build respect and power
+- Script monitors win chance against all other gangs
+- Continues equipment upgrades and ascensions
 - Automatically manages wanted level with vigilante justice (if penalty > 1%)
-- Ascends members when their bonuses would double
+
+**Active Warfare** (Win chance ≥ 95%, clashes enabled):
+- Top 6 members (by combat stats) engage in territory warfare
+- Remaining 6 members traffic illegal arms to earn money
+- Clashes automatically enabled when win chance reaches 95%
+- Continues ascensions and wanted level management
 - Goal: Achieve 100% territory control
 
 ### Phase 5: Money Making (100% Territory)
@@ -96,10 +103,11 @@ The script shows real-time information:
 
 - The script is designed to run continuously - don't stop it unless necessary
 - It automatically manages money spending on equipment while keeping reserves
-- Only the top 6 members (by combat stats) fight in territory warfare for efficiency
-- The other 6 members earn money through arms trafficking during warfare phase
+- Members commit terrorism while waiting for safe clash conditions (< 95% win chance)
+- Once clashes are safe, only the top 6 members (by combat stats) fight in territory warfare
+- The other 6 members earn money through arms trafficking during active warfare
 - Wanted level penalty is automatically managed - vigilante justice activates if it exceeds 1%
-- Territory warfare clashes are only engaged when you have ≥95% win chance
+- Territory warfare clashes are only engaged when you have ≥95% win chance against all gangs
 - Arms trafficking scales with territory controlled, maximizing income at 100%
 - Ascension timing is optimized to maximize long-term stat growth (2x multiplier threshold)
 
