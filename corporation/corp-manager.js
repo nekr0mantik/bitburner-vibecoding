@@ -226,29 +226,23 @@ export async function main(ns) {
         const warehouse = ns.corporation.getWarehouse(divisionName, city);
         const division = ns.corporation.getDivision(divisionName);
 
+        // Calculate warehouse usage
+        const warehouseUsed = warehouse.sizeUsed || 0;
+        const warehouseSize = warehouse.size || 0;
+        const usagePercent = warehouseSize > 0 ? (warehouseUsed / warehouseSize) * 100 : 0;
+
         // Log warehouse status for Agriculture
         if (division.type === "Agriculture") {
-            const materials = ["Water", "Energy", "Hardware", "AI Cores", "Real Estate", "Plants", "Food"];
-            const status = materials.map(mat => {
-                try {
-                    const material = ns.corporation.getMaterial(divisionName, city, mat);
-                    return `${mat}: ${ns.formatNumber(material.qty)}`;
-                } catch {
-                    return "";
-                }
-            }).filter(s => s).join(", ");
-            if (status) {
-                ns.print(`  ${city} Materials: ${status}`);
-            }
+            ns.print(`  ${city} Warehouse: ${ns.formatNumber(warehouseUsed)}/${ns.formatNumber(warehouseSize)} (${usagePercent.toFixed(1)}%)`);
         }
 
-        // Upgrade warehouse if needed
-        if (warehouse.size < TARGET_WAREHOUSE_SIZE && corp.funds > 1e9) {
+        // Only upgrade warehouse if it's getting full (>80% capacity)
+        if (usagePercent > 80 && warehouse.size < TARGET_WAREHOUSE_SIZE) {
             try {
                 const upgradeLevels = Math.min(10, Math.floor((TARGET_WAREHOUSE_SIZE - warehouse.size) / 100));
-                if (upgradeLevels > 0) {
+                if (upgradeLevels > 0 && corp.funds > 1e9) {
                     ns.corporation.upgradeWarehouse(divisionName, city, upgradeLevels);
-                    ns.print(`✓ Upgraded warehouse in ${city} by ${upgradeLevels} levels`);
+                    ns.print(`  ${city}: ✓ Upgraded warehouse by ${upgradeLevels} levels (was ${usagePercent.toFixed(1)}% full)`);
                 }
             } catch (e) {
                 // Can't upgrade
@@ -265,6 +259,9 @@ export async function main(ns) {
                 // Smart Supply might already be enabled
             }
 
+            // Buy boost materials to improve production (Hardware:Robots:AI Cores:Real Estate = 1:1:1:5 ratio)
+            await buyBoostMaterials(ns, divisionName, city, corp, warehouse);
+
             // Set up selling for output materials
             try {
                 ns.corporation.sellMaterial(divisionName, city, "Plants", "MAX", "MP");
@@ -272,6 +269,88 @@ export async function main(ns) {
             } catch (e) {
                 // Selling setup failed
             }
+        }
+    }
+
+    /**
+     * Buy boost materials to improve production
+     * Ratio: Hardware:Robots:AI Cores:Real Estate = 1:1:1:5
+     */
+    async function buyBoostMaterials(ns, divisionName, city, corp, warehouse) {
+        try {
+            // Get current material quantities
+            const hardware = ns.corporation.getMaterial(divisionName, city, "Hardware");
+            const robots = ns.corporation.getMaterial(divisionName, city, "Robots");
+            const aiCores = ns.corporation.getMaterial(divisionName, city, "AI Cores");
+            const realEstate = ns.corporation.getMaterial(divisionName, city, "Real Estate");
+
+            // Calculate material sizes (approximate)
+            const HARDWARE_SIZE = 0.06;
+            const ROBOTS_SIZE = 0.5;
+            const AI_CORES_SIZE = 0.1;
+            const REAL_ESTATE_SIZE = 0.005;
+
+            // Determine the target amount based on the lowest ratio component
+            // Ratio is 1:1:1:5 for Hardware:Robots:AI:RealEstate
+            const currentRatios = {
+                hardware: hardware.qty,
+                robots: robots.qty,
+                aiCores: aiCores.qty,
+                realEstate: realEstate.qty / 5  // Divide by 5 because we want 5x more
+            };
+
+            // Find the minimum to determine what to boost
+            const minRatio = Math.min(currentRatios.hardware, currentRatios.robots, currentRatios.aiCores, currentRatios.realEstate);
+
+            // Calculate how much we need to buy to balance the ratios
+            const toBuy = {
+                hardware: Math.max(0, minRatio + 10 - hardware.qty),
+                robots: Math.max(0, minRatio + 10 - robots.qty),
+                aiCores: Math.max(0, minRatio + 10 - aiCores.qty),
+                realEstate: Math.max(0, (minRatio + 10) * 5 - realEstate.qty)
+            };
+
+            // Calculate space needed
+            const spaceNeeded =
+                toBuy.hardware * HARDWARE_SIZE +
+                toBuy.robots * ROBOTS_SIZE +
+                toBuy.aiCores * AI_CORES_SIZE +
+                toBuy.realEstate * REAL_ESTATE_SIZE;
+
+            // Calculate available space (keep 20% buffer for production)
+            const availableSpace = (warehouse.size - warehouse.sizeUsed) * 0.8;
+
+            // Reserve funds for potential warehouse upgrade
+            const warehouseUpgradeCost = warehouse.size < TARGET_WAREHOUSE_SIZE ? 1e9 : 0;
+            const availableFunds = corp.funds - warehouseUpgradeCost;
+
+            // Only buy if we have space and funds
+            if (spaceNeeded < availableSpace && availableFunds > 1e8) {
+                // Calculate cost for materials
+                const hardwareCost = ns.corporation.getMaterialData("Hardware").baseCost * toBuy.hardware;
+                const robotsCost = ns.corporation.getMaterialData("Robots").baseCost * toBuy.robots;
+                const aiCoresCost = ns.corporation.getMaterialData("AI Cores").baseCost * toBuy.aiCores;
+                const realEstateCost = ns.corporation.getMaterialData("Real Estate").baseCost * toBuy.realEstate;
+                const totalCost = hardwareCost + robotsCost + aiCoresCost + realEstateCost;
+
+                if (availableFunds > totalCost * 2) { // Only buy if we have 2x the cost
+                    // Buy the materials
+                    if (toBuy.hardware > 0) {
+                        ns.corporation.buyMaterial(divisionName, city, "Hardware", toBuy.hardware / 10);
+                    }
+                    if (toBuy.robots > 0) {
+                        ns.corporation.buyMaterial(divisionName, city, "Robots", toBuy.robots / 10);
+                    }
+                    if (toBuy.aiCores > 0) {
+                        ns.corporation.buyMaterial(divisionName, city, "AI Cores", toBuy.aiCores / 10);
+                    }
+                    if (toBuy.realEstate > 0) {
+                        ns.corporation.buyMaterial(divisionName, city, "Real Estate", toBuy.realEstate / 10);
+                    }
+                }
+            }
+        } catch (e) {
+            // Material buying failed
         }
     }
 
