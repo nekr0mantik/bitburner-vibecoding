@@ -71,7 +71,7 @@ export async function main(ns) {
                 ns.print("");
                 ns.print("⚠️  WAITING FOR SMART SUPPLY UNLOCK");
                 ns.print("   Smart Supply is required before operations can begin.");
-                const cost = ns.corporation.getUnlockUpgradeCost("Smart Supply");
+                const cost = ns.corporation.getUnlockCost("Smart Supply");
                 ns.print(`   Cost: $${ns.formatNumber(cost)}`);
                 ns.print(`   Current funds: $${ns.formatNumber(corp.funds)}`);
             }
@@ -305,9 +305,9 @@ export async function main(ns) {
         try {
             const hasUnlock = ns.corporation.hasUnlock(upgradeName);
             if (!hasUnlock) {
-                const cost = ns.corporation.getUnlockUpgradeCost(upgradeName);
+                const cost = ns.corporation.getUnlockCost(upgradeName);
                 if (corp.funds >= cost) {
-                    ns.corporation.unlockUpgrade(upgradeName);
+                    ns.corporation.purchaseUnlock(upgradeName);
                     ns.print(`✓✓✓ UNLOCKED ${upgradeName} (Cost: $${ns.formatNumber(cost)}) ✓✓✓`);
                     ns.print("");
                 }
@@ -332,9 +332,9 @@ export async function main(ns) {
             try {
                 const hasUnlock = ns.corporation.hasUnlock(unlockName);
                 if (!hasUnlock) {
-                    const cost = ns.corporation.getUnlockUpgradeCost(unlockName);
+                    const cost = ns.corporation.getUnlockCost(unlockName);
                     if (corp.funds > cost * 10) { // Only buy if we have 10x the cost
-                        ns.corporation.unlockUpgrade(unlockName);
+                        ns.corporation.purchaseUnlock(unlockName);
                         ns.print(`✓ Unlocked ${unlockName} (Cost: $${ns.formatNumber(cost)})`);
                     }
                 }
