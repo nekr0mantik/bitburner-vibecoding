@@ -27,13 +27,8 @@ export async function main(ns) {
     ns.clearLog();
     ns.tail();
 
-    // Check if we're in a gang
-    if (!ns.gang.inGang()) {
-        ns.print("ERROR: Not in a gang! Please create a gang first.");
-        return;
-    }
-
     // Load static configuration from file
+    // Note: gang-start.js already verified we're in a gang before launching this script
     const configPath = "/tmp/gang-config.txt";
     if (!ns.fileExists(configPath)) {
         ns.print("ERROR: Configuration file not found!");
@@ -50,11 +45,13 @@ export async function main(ns) {
     ns.print(`Ascension threshold: ${ASCENSION_MULTIPLIER_THRESHOLD}x`);
     ns.print(`Territory clash threshold: ${TERRITORY_CLASH_WIN_THRESHOLD * 100}%`);
 
+    // Get initial member list once, then maintain it locally
+    const members = ns.gang.getMemberNames();
+
     while (true) {
         try {
             // Get current gang information
             const gangInfo = ns.gang.getGangInformation();
-            const members = ns.gang.getMemberNames();
             const territory = gangInfo.territory;
 
             // Calculate wanted level penalty
@@ -71,7 +68,7 @@ export async function main(ns) {
             ns.print("");
 
             // 1. Recruit new members
-            await recruitMembers(ns);
+            await recruitMembers(ns, members);
 
             // 2. Check and perform ascensions
             await checkAscensions(ns, members);
@@ -98,11 +95,12 @@ export async function main(ns) {
     /**
      * Recruit new gang members when available
      */
-    async function recruitMembers(ns) {
+    async function recruitMembers(ns, members) {
         let recruited = 0;
         while (ns.gang.canRecruitMember()) {
-            const memberName = generateMemberName(ns.gang.getMemberNames().length);
+            const memberName = generateMemberName(members.length);
             if (ns.gang.recruitMember(memberName)) {
+                members.push(memberName); // Add to local array
                 ns.print(`✓ Recruited new member: ${memberName}`);
                 recruited++;
             } else {
