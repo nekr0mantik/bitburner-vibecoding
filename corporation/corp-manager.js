@@ -59,7 +59,8 @@ export async function main(ns) {
             // Try to accept investment if needed
             await manageInvestment(ns, corp);
 
-            // Purchase corporation upgrades
+            // Unlock and purchase corporation upgrades
+            await unlockPriorityUpgrades(ns, corp);
             await purchaseUpgrades(ns, corp);
 
         } catch (error) {
@@ -211,6 +212,22 @@ export async function main(ns) {
 
         const warehouse = ns.corporation.getWarehouse(divisionName, city);
 
+        // Log warehouse status for Agriculture
+        if (division.type === "Agriculture") {
+            const materials = ["Water", "Energy", "Hardware", "AI Cores", "Real Estate", "Plants", "Food"];
+            const status = materials.map(mat => {
+                try {
+                    const material = ns.corporation.getMaterial(divisionName, city, mat);
+                    return `${mat}: ${ns.formatNumber(material.qty)}`;
+                } catch {
+                    return "";
+                }
+            }).filter(s => s).join(", ");
+            if (status) {
+                ns.print(`  ${city} Materials: ${status}`);
+            }
+        }
+
         // Upgrade warehouse if needed
         if (warehouse.size < TARGET_WAREHOUSE_SIZE && corp.funds > 1e9) {
             try {
@@ -224,33 +241,44 @@ export async function main(ns) {
             }
         }
 
-        // Enable smart supply
-        if (SMART_SUPPLY_ENABLED) {
-            try {
-                const division = ns.corporation.getDivision(divisionName);
-                if (division.type === "Agriculture") {
+        // Manage materials for Agriculture
+        const division = ns.corporation.getDivision(divisionName);
+        if (division.type === "Agriculture") {
+            // Check if Smart Supply is unlocked
+            const hasSmartSupply = ns.corporation.hasUnlockUpgrade("Smart Supply");
+
+            if (hasSmartSupply && SMART_SUPPLY_ENABLED) {
+                // Use Smart Supply for automatic material management
+                try {
                     ns.corporation.setSmartSupply(divisionName, city, true);
+                    ns.corporation.setSmartSupplyUseLeftovers(divisionName, city, true);
+                    ns.print(`  ${city}: Smart Supply ENABLED`);
+                } catch (e) {
+                    ns.print(`  ${city}: Failed to enable Smart Supply`);
                 }
-            } catch (e) {
-                // Smart supply not unlocked yet
+            } else {
+                // Manually manage materials if Smart Supply not available
+                try {
+                    if (!hasSmartSupply) {
+                        ns.print(`  ${city}: Smart Supply not unlocked - manual mode`);
+                    }
+                    // Buy materials needed for production (per second rates)
+                    ns.corporation.buyMaterial(divisionName, city, "Water", 500);
+                    ns.corporation.buyMaterial(divisionName, city, "Energy", 500);
+                    ns.corporation.buyMaterial(divisionName, city, "Hardware", 125);
+                    ns.corporation.buyMaterial(divisionName, city, "AI Cores", 75);
+                    ns.corporation.buyMaterial(divisionName, city, "Real Estate", 27000);
+                } catch (e) {
+                    ns.print(`  ${city}: Material purchasing failed: ${e}`);
+                }
             }
-        }
 
-        // For Agriculture, set material purchases
-        if (ns.corporation.getDivision(divisionName).type === "Agriculture") {
+            // Always set up selling for output materials
             try {
-                // Buy materials needed for production
-                ns.corporation.buyMaterial(divisionName, city, "Water", 500);
-                ns.corporation.buyMaterial(divisionName, city, "Energy", 500);
-                ns.corporation.buyMaterial(divisionName, city, "Hardware", 25);
-                ns.corporation.buyMaterial(divisionName, city, "AI Cores", 3);
-                ns.corporation.buyMaterial(divisionName, city, "Real Estate", 2700);
-
-                // Sell output
                 ns.corporation.sellMaterial(divisionName, city, "Plants", "MAX", "MP");
                 ns.corporation.sellMaterial(divisionName, city, "Food", "MAX", "MP");
             } catch (e) {
-                // Material management failed
+                // Selling setup failed
             }
         }
     }
@@ -278,21 +306,52 @@ export async function main(ns) {
     }
 
     /**
+     * Unlock priority one-time upgrades
+     */
+    async function unlockPriorityUpgrades(ns, corp) {
+        // Priority unlocks in order of importance
+        const priorityUnlocks = [
+            "Smart Supply",      // Essential for automatic material purchasing
+            "Warehouse API",     // Allows warehouse management
+            "Office API",        // Allows office management
+            "Export"            // Allows exporting materials between divisions
+        ];
+
+        for (const unlockName of priorityUnlocks) {
+            try {
+                const hasUnlock = ns.corporation.hasUnlockUpgrade(unlockName);
+                if (!hasUnlock) {
+                    const cost = ns.corporation.getUnlockUpgradeCost(unlockName);
+                    if (corp.funds > cost * 2) { // Only buy if we have 2x the cost
+                        ns.corporation.unlockUpgrade(unlockName);
+                        ns.print(`✓ Unlocked ${unlockName} (Cost: $${ns.formatNumber(cost)})`);
+                    } else {
+                        ns.print(`⏳ Need $${ns.formatNumber(cost)} to unlock ${unlockName}`);
+                    }
+                }
+            } catch (e) {
+                // Upgrade doesn't exist or can't be unlocked
+            }
+        }
+    }
+
+    /**
      * Purchase corporation upgrades
      */
     async function purchaseUpgrades(ns, corp) {
-        // List of useful upgrades
+        // List of useful upgrades in priority order
         const upgrades = [
-            "Smart Factories",
-            "Smart Storage",
-            "DreamSense",
-            "Wilson Analytics",
-            "Nuoptimal Nootropic Injector Implants",
-            "Speech Processor Implants",
-            "Neural Accelerators",
-            "FocusWires",
-            "ABC SalesBots",
-            "Project Insight"
+            "Wilson Analytics",   // Essential for production analysis
+            "Smart Factories",    // Increases production
+            "Smart Storage",      // Increases storage efficiency
+            "AdVert.Inc",        // Improves sales (demand/competition)
+            "FocusWires",        // Improves employee stats
+            "Neural Accelerators", // Improves employee stats
+            "Speech Processor Implants", // Improves employee stats
+            "Nuoptimal Nootropic Injector Implants", // Improves employee stats
+            "Project Insight",   // Reduces corruption
+            "ABC SalesBots",     // Improves sales
+            "DreamSense"         // Expensive late-game upgrade
         ];
 
         for (const upgradeName of upgrades) {
