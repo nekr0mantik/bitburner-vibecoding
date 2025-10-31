@@ -174,6 +174,8 @@ export async function main(ns) {
 
         // All cities expanded, now set up each one
         for (const city of CITIES) {
+            ns.print(`→ Checking ${city}...`);
+
             // Check if office has size 3
             let office;
             try {
@@ -184,12 +186,13 @@ export async function main(ns) {
             }
 
             if (office.size < 3) {
+                const needed = 3 - office.size;
                 try {
-                    ns.corporation.upgradeOfficeSize(AGRICULTURE, city, 3);
+                    ns.corporation.upgradeOfficeSize(AGRICULTURE, city, needed);
                     ns.print(`✓ Upgraded office size to 3 in ${city}`);
                     return; // One upgrade at a time
                 } catch (e) {
-                    ns.print(`⏳ Can't afford office size upgrade in ${city}`);
+                    ns.print(`⏳ Can't afford office size upgrade in ${city} (need ${needed} more)`);
                     return;
                 }
             }
@@ -247,25 +250,30 @@ export async function main(ns) {
                     ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Operations", 1);
                     ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Engineer", 1);
                     ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Business", 1);
+                    ns.print(`  ✓ Assigned employees in ${city}`);
                 } catch (e) {
-                    // Assignment might fail
+                    ns.print(`  ⚠ Assignment failed in ${city}: ${e}`);
                 }
             }
 
             // Enable Smart Supply
-            try {
-                ns.corporation.setSmartSupply(AGRICULTURE, city, true);
-                ns.corporation.setSmartSupplyUseLeftovers(AGRICULTURE, city, true);
-            } catch (e) {
-                // Already enabled
-            }
+            if (employees.length >= 3) {
+                try {
+                    ns.corporation.setSmartSupply(AGRICULTURE, city, true);
+                    ns.corporation.setSmartSupplyUseLeftovers(AGRICULTURE, city, true);
+                    ns.print(`  ✓ Smart Supply enabled in ${city}`);
+                } catch (e) {
+                    ns.print(`  ⚠ Smart Supply failed in ${city}: ${e}`);
+                }
 
-            // Set up selling
-            try {
-                ns.corporation.sellMaterial(AGRICULTURE, city, "Plants", "MAX", "MP");
-                ns.corporation.sellMaterial(AGRICULTURE, city, "Food", "MAX", "MP");
-            } catch (e) {
-                // Selling already set up
+                // Set up selling
+                try {
+                    ns.corporation.sellMaterial(AGRICULTURE, city, "Plants", "MAX", "MP");
+                    ns.corporation.sellMaterial(AGRICULTURE, city, "Food", "MAX", "MP");
+                    ns.print(`  ✓ Selling configured in ${city}`);
+                } catch (e) {
+                    ns.print(`  ⚠ Selling setup failed in ${city}: ${e}`);
+                }
             }
         }
 
