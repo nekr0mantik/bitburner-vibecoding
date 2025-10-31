@@ -1,6 +1,7 @@
 /** @param {NS} ns */
 export async function main(ns) {
     // Configuration
+    const MAX_GANG_MEMBERS = 12; // Hard cap in Bitburner
     const ASCENSION_MULTIPLIER_THRESHOLD = 2.0; // Ascend when new multiplier is 2x current
     const TERRITORY_CLASH_WIN_THRESHOLD = 0.95; // Enable clashes at 95% win chance
     const EQUIPMENT_PURCHASE_DELAY = 100; // ms between equipment purchases
@@ -42,7 +43,7 @@ export async function main(ns) {
             ns.clearLog();
             ns.print("=== Gang Manager Status ===");
             ns.print(`Gang: ${gangInfo.faction}`);
-            ns.print(`Members: ${members.length} / ${ns.gang.getMaxMemberCount()}`);
+            ns.print(`Members: ${members.length} / ${MAX_GANG_MEMBERS}`);
             ns.print(`Territory: ${(territory * 100).toFixed(2)}%`);
             ns.print(`Respect: ${ns.formatNumber(gangInfo.respect)}`);
             ns.print(`Wanted Level: ${ns.formatNumber(gangInfo.wantedLevel)}`);
