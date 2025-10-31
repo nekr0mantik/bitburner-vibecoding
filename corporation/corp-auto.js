@@ -5,7 +5,7 @@ export async function main(ns) {
     const AGRICULTURE = "Agriculture";
     const TOBACCO = "Tobacco";
     const CITIES = ["Aevum", "Chongqing", "Sector-12", "New Tokyo", "Ishima", "Volhaven"];
-    const UPDATE_INTERVAL = 5000; // 5 seconds
+    const UPDATE_INTERVAL = 1000; // 1 second
 
     ns.disableLog("ALL");
     ns.clearLog();
