@@ -232,19 +232,23 @@ export async function main(ns) {
         // Phase 2: Upgrade office 3→4, hire 4th employee
         if (state.phase === 2) {
             for (const city of CITIES) {
-                const office = ns.corporation.getOffice(AGRICULTURE, city);
+                let office = ns.corporation.getOffice(AGRICULTURE, city);
                 if (office.size < 4) {
                     try {
                         ns.corporation.upgradeOfficeSize(AGRICULTURE, city, 1);
                         ns.print(`✓ Office 4 in ${city}`);
+                        // Re-fetch office after upgrade
+                        office = ns.corporation.getOffice(AGRICULTURE, city);
                     } catch (e) {
                         ns.print(`⏳ Can't afford office in ${city}`);
                         return;
                     }
                 }
 
-                if (office.numEmployees < 4) {
+                // Hire to full capacity
+                while (office.numEmployees < office.size) {
                     ns.corporation.hireEmployee(AGRICULTURE, city);
+                    office = ns.corporation.getOffice(AGRICULTURE, city);
                 }
             }
             state.phase = 3;
@@ -257,13 +261,15 @@ export async function main(ns) {
             // Set all to R&D
             for (const city of CITIES) {
                 try {
-                    await ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Research & Development", 4);
-                    await ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Operations", 0);
-                    await ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Engineer", 0);
-                    await ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Business", 0);
-                    await ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Management", 0);
+                    // First, clear all other positions
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Operations", 0);
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Engineer", 0);
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Business", 0);
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Management", 0);
+                    // Then assign all to R&D
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Research & Development", 4);
                 } catch (e) {
-                    // Ignore
+                    ns.print(`ERROR assigning R&D in ${city}: ${e}`);
                 }
             }
 
@@ -280,14 +286,16 @@ export async function main(ns) {
         if (state.phase === 4) {
             for (const city of CITIES) {
                 try {
-                    await ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Operations", 1);
-                    await ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Engineer", 1);
-                    await ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Business", 1);
-                    await ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Management", 1);
-                    await ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Research & Development", 0);
+                    // Clear R&D first
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Research & Development", 0);
+                    // Then set balanced jobs (1 each for 4 employees)
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Operations", 1);
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Engineer", 1);
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Business", 1);
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Management", 1);
                     ns.print(`✓ Jobs set in ${city}`);
                 } catch (e) {
-                    // Ignore
+                    ns.print(`ERROR setting jobs in ${city}: ${e}`);
                 }
             }
             state.phase = 5;
@@ -446,11 +454,13 @@ export async function main(ns) {
 
             // Upgrade offices to 8
             for (const city of CITIES) {
-                const office = ns.corporation.getOffice(AGRICULTURE, city);
+                let office = ns.corporation.getOffice(AGRICULTURE, city);
                 if (office.size < 8) {
                     try {
                         ns.corporation.upgradeOfficeSize(AGRICULTURE, city, 8 - office.size);
                         ns.print(`✓ Office 8 in ${city}`);
+                        // Re-fetch office after upgrade
+                        office = ns.corporation.getOffice(AGRICULTURE, city);
                     } catch (e) {
                         ns.print(`⏳ Can't afford office in ${city}`);
                         allDone = false;
@@ -460,17 +470,20 @@ export async function main(ns) {
                 // Hire to full
                 while (office.numEmployees < office.size) {
                     ns.corporation.hireEmployee(AGRICULTURE, city);
+                    // Re-fetch to get updated employee count
+                    office = ns.corporation.getOffice(AGRICULTURE, city);
                 }
 
-                // Balanced jobs for now
+                // Balanced jobs for now (clear R&D first, then assign)
                 try {
                     const perJob = Math.floor(office.size / 4);
-                    await ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Operations", perJob);
-                    await ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Engineer", perJob);
-                    await ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Business", perJob);
-                    await ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Management", office.size - perJob * 3);
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Research & Development", 0);
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Operations", perJob);
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Engineer", perJob);
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Business", perJob);
+                    ns.corporation.setAutoJobAssignment(AGRICULTURE, city, "Management", office.size - perJob * 3);
                 } catch (e) {
-                    // Ignore
+                    ns.print(`ERROR setting jobs in ${city}: ${e}`);
                 }
             }
 
@@ -543,15 +556,22 @@ export async function main(ns) {
 
             // Hire 3 employees, all to R&D initially
             for (const city of CITIES) {
-                const office = ns.corporation.getOffice(CHEMICAL, city);
+                let office = ns.corporation.getOffice(CHEMICAL, city);
                 while (office.numEmployees < 3) {
                     ns.corporation.hireEmployee(CHEMICAL, city);
+                    office = ns.corporation.getOffice(CHEMICAL, city);
                 }
 
                 try {
-                    await ns.corporation.setAutoJobAssignment(CHEMICAL, city, "Research & Development", 3);
+                    // Clear all positions first
+                    ns.corporation.setAutoJobAssignment(CHEMICAL, city, "Operations", 0);
+                    ns.corporation.setAutoJobAssignment(CHEMICAL, city, "Engineer", 0);
+                    ns.corporation.setAutoJobAssignment(CHEMICAL, city, "Business", 0);
+                    ns.corporation.setAutoJobAssignment(CHEMICAL, city, "Management", 0);
+                    // Then assign to R&D
+                    ns.corporation.setAutoJobAssignment(CHEMICAL, city, "Research & Development", 3);
                 } catch (e) {
-                    // Ignore
+                    ns.print(`ERROR assigning R&D in Chemical ${city}: ${e}`);
                 }
             }
 
@@ -601,10 +621,15 @@ export async function main(ns) {
             if (chemDiv.researchPoints >= 100) {
                 for (const city of CITIES) {
                     try {
-                        await ns.corporation.setAutoJobAssignment(CHEMICAL, city, "Engineer", 2);
-                        await ns.corporation.setAutoJobAssignment(CHEMICAL, city, "Research & Development", 1);
+                        // Clear positions first
+                        ns.corporation.setAutoJobAssignment(CHEMICAL, city, "Operations", 0);
+                        ns.corporation.setAutoJobAssignment(CHEMICAL, city, "Business", 0);
+                        ns.corporation.setAutoJobAssignment(CHEMICAL, city, "Management", 0);
+                        // Then assign: 2 Engineers, 1 R&D
+                        ns.corporation.setAutoJobAssignment(CHEMICAL, city, "Engineer", 2);
+                        ns.corporation.setAutoJobAssignment(CHEMICAL, city, "Research & Development", 1);
                     } catch (e) {
-                        // Ignore
+                        ns.print(`ERROR assigning Chemical jobs in ${city}: ${e}`);
                     }
                 }
             }
@@ -714,7 +739,7 @@ export async function main(ns) {
         // Phase 2: Setup offices (1 main + 5 support)
         if (state.phase === 2) {
             for (const city of CITIES) {
-                const office = ns.corporation.getOffice(TOBACCO, city);
+                let office = ns.corporation.getOffice(TOBACCO, city);
 
                 // Main office (Sector-12) gets bigger
                 const targetSize = city === MAIN_OFFICE_CITY ? 30 : 6;
@@ -722,6 +747,8 @@ export async function main(ns) {
                 if (office.size < targetSize) {
                     try {
                         ns.corporation.upgradeOfficeSize(TOBACCO, city, targetSize - office.size);
+                        // Re-fetch after upgrade
+                        office = ns.corporation.getOffice(TOBACCO, city);
                     } catch (e) {
                         return;
                     }
@@ -730,6 +757,7 @@ export async function main(ns) {
                 // Hire to full
                 while (office.numEmployees < office.size) {
                     ns.corporation.hireEmployee(TOBACCO, city);
+                    office = ns.corporation.getOffice(TOBACCO, city);
                 }
 
                 // Job assignments
@@ -741,20 +769,26 @@ export async function main(ns) {
                     const bus = office.size - opsEng * 2 - mgt - rd;
 
                     try {
-                        await ns.corporation.setAutoJobAssignment(TOBACCO, city, "Operations", opsEng);
-                        await ns.corporation.setAutoJobAssignment(TOBACCO, city, "Engineer", opsEng);
-                        await ns.corporation.setAutoJobAssignment(TOBACCO, city, "Management", mgt);
-                        await ns.corporation.setAutoJobAssignment(TOBACCO, city, "Research & Development", rd);
-                        await ns.corporation.setAutoJobAssignment(TOBACCO, city, "Business", bus);
+                        ns.corporation.setAutoJobAssignment(TOBACCO, city, "Operations", opsEng);
+                        ns.corporation.setAutoJobAssignment(TOBACCO, city, "Engineer", opsEng);
+                        ns.corporation.setAutoJobAssignment(TOBACCO, city, "Management", mgt);
+                        ns.corporation.setAutoJobAssignment(TOBACCO, city, "Research & Development", rd);
+                        ns.corporation.setAutoJobAssignment(TOBACCO, city, "Business", bus);
                     } catch (e) {
-                        // Ignore
+                        ns.print(`ERROR assigning jobs in Tobacco ${city}: ${e}`);
                     }
                 } else {
                     // Support offices: All to R&D
                     try {
-                        await ns.corporation.setAutoJobAssignment(TOBACCO, city, "Research & Development", office.size);
+                        // Clear other positions first
+                        ns.corporation.setAutoJobAssignment(TOBACCO, city, "Operations", 0);
+                        ns.corporation.setAutoJobAssignment(TOBACCO, city, "Engineer", 0);
+                        ns.corporation.setAutoJobAssignment(TOBACCO, city, "Business", 0);
+                        ns.corporation.setAutoJobAssignment(TOBACCO, city, "Management", 0);
+                        // Then assign all to R&D
+                        ns.corporation.setAutoJobAssignment(TOBACCO, city, "Research & Development", office.size);
                     } catch (e) {
-                        // Ignore
+                        ns.print(`ERROR assigning R&D in Tobacco ${city}: ${e}`);
                     }
                 }
             }
