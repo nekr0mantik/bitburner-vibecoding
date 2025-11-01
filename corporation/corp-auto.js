@@ -44,6 +44,72 @@ export async function main(ns) {
         ns.write(STATE_FILE, JSON.stringify(state), "w");
     }
 
+    /**
+     * Adjust selling prices to match production and prevent warehouse clogging
+     */
+    function adjustSellPrices(ns, corp) {
+        // Only adjust if Agriculture division exists and we're past phase 2
+        const divisions = corp.divisions || [];
+        if (!divisions.includes(AGRICULTURE)) return;
+
+        for (const city of CITIES) {
+            try {
+                const warehouse = ns.corporation.getWarehouse(AGRICULTURE, city);
+
+                // Adjust Plants selling
+                const plants = ns.corporation.getMaterial(AGRICULTURE, city, "Plants");
+                if (plants.desiredSellAmount !== "0" && plants.productionAmount > 0) {
+                    adjustMaterialPrice(ns, city, "Plants", plants, warehouse);
+                }
+
+                // Adjust Food selling
+                const food = ns.corporation.getMaterial(AGRICULTURE, city, "Food");
+                if (food.desiredSellAmount !== "0" && food.productionAmount > 0) {
+                    adjustMaterialPrice(ns, city, "Food", food, warehouse);
+                }
+            } catch (e) {
+                // City not set up yet, skip
+            }
+        }
+    }
+
+    function adjustMaterialPrice(ns, city, materialName, material, warehouse) {
+        const stored = material.stored;
+        const production = material.productionAmount;
+        const actualSales = material.actualSellAmount;
+        const warehouseCapacity = warehouse.size;
+
+        // Calculate how full the warehouse is with this material
+        const fillPercentage = stored / warehouseCapacity;
+
+        // Determine price adjustment
+        let newPrice = material.desiredSellPrice || "MP";
+
+        // If warehouse is filling up (>10% of capacity) or sales < production, reduce price
+        if (fillPercentage > 0.1 || (stored > production * 2 && actualSales < production)) {
+            // Reduce price significantly based on how much is stored
+            const reduction = Math.max(0.5, 1 - (fillPercentage * 2));
+            newPrice = `MP*${reduction.toFixed(2)}`;
+        }
+        // If warehouse is nearly empty and sales > production, increase price slightly
+        else if (stored < production && actualSales > production * 1.1) {
+            newPrice = "MP*1.01";
+        }
+        // If things are balanced, use MP
+        else if (stored < production * 2 && Math.abs(actualSales - production) < production * 0.1) {
+            newPrice = "MP";
+        }
+
+        // Only update if price changed
+        if (newPrice !== material.desiredSellPrice) {
+            try {
+                ns.corporation.sellMaterial(AGRICULTURE, city, materialName, "MAX", newPrice);
+            } catch (e) {
+                // Ignore errors
+            }
+        }
+    }
+
     let state = loadState();
 
     ns.print("=== Corporation Automation Started ===");
@@ -62,6 +128,11 @@ export async function main(ns) {
             ns.print(`Profit: $${ns.formatNumber(corp.revenue - corp.expenses)}/s`);
             ns.print(`State: ${corp.state}`);
             ns.print("");
+
+            // Adjust selling prices after setup is complete (phase >= 2)
+            if (state.phase >= 2) {
+                adjustSellPrices(ns, corp);
+            }
 
             // Phase execution
             if (state.phase === 0) {
