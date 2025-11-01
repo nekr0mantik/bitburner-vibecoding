@@ -352,7 +352,7 @@ export async function main(ns) {
                 const offer = ns.corporation.getInvestmentOffer();
                 if (offer.round === 1) {
                     ns.print(`💰 Investment offer: $${ns.formatNumber(offer.funds)} for ${offer.shares} shares`);
-                    if (offer.funds >= 2e11) { // At least $200b
+                    if (offer.funds >= 1.4e11) { // At least $140b
                         ns.corporation.acceptInvestmentOffer();
                         ns.print(`✓ Accepted investment round 1`);
                         state.investmentRound = 1;
@@ -372,13 +372,24 @@ export async function main(ns) {
 
         // SubPhase 0: Upgrade offices to 9 employees
         if (state.subPhase === 0) {
-            let allUpgraded = true;
+            // Target: Ops(2), Eng(2), Bus(1), Mgmt(2), R&D(2)
+            const targetJobs = {
+                "Operations": 2,
+                "Engineer": 2,
+                "Business": 1,
+                "Management": 2,
+                "Research & Development": 2
+            };
+
+            let allDone = true;
             for (const city of CITIES) {
                 const office = ns.corporation.getOffice(AGRICULTURE, city);
+
+                // Upgrade office size if needed
                 if (office.size < 9) {
-                    allUpgraded = false;
+                    allDone = false;
                     try {
-                        ns.corporation.upgradeOfficeSize(AGRICULTURE, city, 3);
+                        ns.corporation.upgradeOfficeSize(AGRICULTURE, city, 9 - office.size);
                         ns.print(`✓ Upgraded office in ${city} to 9`);
                     } catch (e) {
                         ns.print(`⏳ Can't afford office upgrade in ${city}`);
@@ -386,33 +397,25 @@ export async function main(ns) {
                     }
                 }
 
-                // Hire up to 9 employees directly into positions
-                // Target: Ops(2), Eng(2), Bus(1), Mgmt(2), R&D(2)
-                const currentOffice = ns.corporation.getOffice(AGRICULTURE, city);
-                const employeeCount = currentOffice.numEmployees || 0;
+                // Hire employees based on what's missing
+                for (const [position, targetCount] of Object.entries(targetJobs)) {
+                    const currentCount = office.employeeJobs[position] || 0;
+                    const needed = targetCount - currentCount;
 
-                if (employeeCount < 9) {
-                    const positions = [
-                        "Operations", "Operations",
-                        "Engineer", "Engineer",
-                        "Business",
-                        "Management", "Management",
-                        "Research & Development", "Research & Development"
-                    ];
-                    const position = positions[employeeCount];
-
-                    const hired = ns.corporation.hireEmployee(AGRICULTURE, city, position);
-                    if (hired) {
-                        ns.print(`✓ Hired ${position} in ${city} (${employeeCount + 1}/9)`);
-                        return; // One at a time
-                    } else {
-                        ns.print(`⏳ Failed to hire ${position} in ${city}`);
-                        return;
+                    if (needed > 0) {
+                        allDone = false;
+                        const hired = ns.corporation.hireEmployee(AGRICULTURE, city, position);
+                        if (hired) {
+                            ns.print(`✓ Hired ${position} in ${city} (${currentCount + 1}/${targetCount})`);
+                        } else {
+                            ns.print(`⏳ Failed to hire ${position} in ${city}`);
+                            return;
+                        }
                     }
                 }
             }
 
-            if (allUpgraded) {
+            if (allDone) {
                 ns.print(`✓ All offices upgraded to 9 employees`);
                 state.subPhase = 1;
             }
@@ -473,17 +476,60 @@ export async function main(ns) {
             }
         }
 
-        // SubPhase 3: Buy more materials
+        // SubPhase 3: Buy more materials (Hardware: 2800, Robots: 96, AI Cores: 2520, Real Estate: 146400)
         if (state.subPhase === 3) {
             if (!state.materialsPhase4aDone) {
-                ns.print("⏳ Manual step required:");
-                ns.print("   Buy materials for each city (1 tick each):");
-                ns.print("   - Hardware: 267.5/s to 2800 total");
-                ns.print("   - Robots: 9.6/s to 96 total");
-                ns.print("   - AI Cores: 244.5/s to 2520 total");
-                ns.print("   - Real Estate: 11940/s to 146400 total");
-                ns.print("");
-                ns.print("   Set materialsPhase4aDone = true when complete");
+                let allPurchased = true;
+                for (const city of CITIES) {
+                    // Check current stored amounts
+                    const hardware = ns.corporation.getMaterial(AGRICULTURE, city, "Hardware");
+                    const robots = ns.corporation.getMaterial(AGRICULTURE, city, "Robots");
+                    const aiCores = ns.corporation.getMaterial(AGRICULTURE, city, "AI Cores");
+                    const realEstate = ns.corporation.getMaterial(AGRICULTURE, city, "Real Estate");
+
+                    // Calculate how much more is needed
+                    const hardwareNeeded = Math.max(0, 2800 - hardware.stored);
+                    const robotsNeeded = Math.max(0, 96 - robots.stored);
+                    const aiNeeded = Math.max(0, 2520 - aiCores.stored);
+                    const realEstateNeeded = Math.max(0, 146400 - realEstate.stored);
+
+                    // Buy only what's needed
+                    if (hardwareNeeded > 0 || robotsNeeded > 0 || aiNeeded > 0 || realEstateNeeded > 0) {
+                        let purchased = 0;
+                        if (hardwareNeeded > 0) {
+                            const result = ns.corporation.bulkPurchase(AGRICULTURE, city, "Hardware", hardwareNeeded);
+                            if (result > 0) purchased++;
+                            ns.print(`  Hardware: ${result}/${hardwareNeeded} (have ${hardware.stored})`);
+                        }
+                        if (robotsNeeded > 0) {
+                            const result = ns.corporation.bulkPurchase(AGRICULTURE, city, "Robots", robotsNeeded);
+                            if (result > 0) purchased++;
+                            ns.print(`  Robots: ${result}/${robotsNeeded} (have ${robots.stored})`);
+                        }
+                        if (aiNeeded > 0) {
+                            const result = ns.corporation.bulkPurchase(AGRICULTURE, city, "AI Cores", aiNeeded);
+                            if (result > 0) purchased++;
+                            ns.print(`  AI Cores: ${result}/${aiNeeded} (have ${aiCores.stored})`);
+                        }
+                        if (realEstateNeeded > 0) {
+                            const result = ns.corporation.bulkPurchase(AGRICULTURE, city, "Real Estate", realEstateNeeded);
+                            if (result > 0) purchased++;
+                            ns.print(`  Real Estate: ${result}/${realEstateNeeded} (have ${realEstate.stored})`);
+                        }
+
+                        if (purchased === 0) {
+                            allPurchased = false;
+                            ns.print(`⏳ ${city}: Waiting for funds to buy materials`);
+                        }
+                    } else {
+                        ns.print(`✓ ${city}: Already has all materials`);
+                    }
+                }
+
+                if (allPurchased) {
+                    state.materialsPhase4aDone = true;
+                    ns.print(`✓ All materials purchased`);
+                }
                 return;
             }
 
@@ -531,17 +577,60 @@ export async function main(ns) {
             }
         }
 
-        // SubPhase 6: Buy final materials
+        // SubPhase 6: Buy final materials (Hardware: 9300, Robots: 726, AI Cores: 6270, Real Estate: 230400)
         if (state.subPhase === 6) {
             if (!state.materialsPhase4bDone) {
-                ns.print("⏳ Manual step required:");
-                ns.print("   Buy materials for each city (1 tick each):");
-                ns.print("   - Hardware: 650/s to 9300 total");
-                ns.print("   - Robots: 63/s to 726 total");
-                ns.print("   - AI Cores: 375/s to 6270 total");
-                ns.print("   - Real Estate: 8400/s to 230400 total");
-                ns.print("");
-                ns.print("   Set materialsPhase4bDone = true when complete");
+                let allPurchased = true;
+                for (const city of CITIES) {
+                    // Check current stored amounts
+                    const hardware = ns.corporation.getMaterial(AGRICULTURE, city, "Hardware");
+                    const robots = ns.corporation.getMaterial(AGRICULTURE, city, "Robots");
+                    const aiCores = ns.corporation.getMaterial(AGRICULTURE, city, "AI Cores");
+                    const realEstate = ns.corporation.getMaterial(AGRICULTURE, city, "Real Estate");
+
+                    // Calculate how much more is needed
+                    const hardwareNeeded = Math.max(0, 9300 - hardware.stored);
+                    const robotsNeeded = Math.max(0, 726 - robots.stored);
+                    const aiNeeded = Math.max(0, 6270 - aiCores.stored);
+                    const realEstateNeeded = Math.max(0, 230400 - realEstate.stored);
+
+                    // Buy only what's needed
+                    if (hardwareNeeded > 0 || robotsNeeded > 0 || aiNeeded > 0 || realEstateNeeded > 0) {
+                        let purchased = 0;
+                        if (hardwareNeeded > 0) {
+                            const result = ns.corporation.bulkPurchase(AGRICULTURE, city, "Hardware", hardwareNeeded);
+                            if (result > 0) purchased++;
+                            ns.print(`  Hardware: ${result}/${hardwareNeeded} (have ${hardware.stored})`);
+                        }
+                        if (robotsNeeded > 0) {
+                            const result = ns.corporation.bulkPurchase(AGRICULTURE, city, "Robots", robotsNeeded);
+                            if (result > 0) purchased++;
+                            ns.print(`  Robots: ${result}/${robotsNeeded} (have ${robots.stored})`);
+                        }
+                        if (aiNeeded > 0) {
+                            const result = ns.corporation.bulkPurchase(AGRICULTURE, city, "AI Cores", aiNeeded);
+                            if (result > 0) purchased++;
+                            ns.print(`  AI Cores: ${result}/${aiNeeded} (have ${aiCores.stored})`);
+                        }
+                        if (realEstateNeeded > 0) {
+                            const result = ns.corporation.bulkPurchase(AGRICULTURE, city, "Real Estate", realEstateNeeded);
+                            if (result > 0) purchased++;
+                            ns.print(`  Real Estate: ${result}/${realEstateNeeded} (have ${realEstate.stored})`);
+                        }
+
+                        if (purchased === 0) {
+                            allPurchased = false;
+                            ns.print(`⏳ ${city}: Waiting for funds to buy materials`);
+                        }
+                    } else {
+                        ns.print(`✓ ${city}: Already has all materials`);
+                    }
+                }
+
+                if (allPurchased) {
+                    state.materialsPhase4bDone = true;
+                    ns.print(`✓ All materials purchased`);
+                }
                 return;
             }
 
