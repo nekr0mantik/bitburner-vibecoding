@@ -3,6 +3,7 @@ export async function main(ns) {
     // Configuration
     const MAX_GANG_MEMBERS = 12; // Hard cap in Bitburner
     const ASCENSION_MULTIPLIER_THRESHOLD = 2.0; // Ascend when new multiplier is 2x current
+    const INITIAL_ASCENSION_THRESHOLD = 8.0; // New members train until they can ascend at 8x
     const TERRITORY_CLASH_WIN_THRESHOLD = 0.95; // Enable clashes at 95% win chance
     const WANTED_PENALTY_THRESHOLD = 1.0; // Do vigilante work if penalty > 1% (wantedLevel/respect*100)
     const WARFARE_MEMBERS_COUNT = 6; // Number of members to assign to territory warfare
@@ -164,6 +165,8 @@ export async function main(ns) {
 
         for (const member of members) {
             const memberInfo = ns.gang.getMemberInformation(member);
+            let memberTotalCost = 0;
+            let itemsPurchased = 0;
 
             for (const equipment of equipmentList) {
                 // Skip if member already has this equipment
@@ -177,11 +180,17 @@ export async function main(ns) {
                 // Only buy if we can afford it and have enough money left over
                 if (ns.getServerMoneyAvailable("home") > cost * 2) {
                     if (ns.gang.purchaseEquipment(member, equipment)) {
-                        ns.print(`💰 Bought ${equipment} for ${member} ($${ns.formatNumber(cost)})`);
+                        memberTotalCost += cost;
+                        itemsPurchased++;
                         purchasesMade++;
                         await ns.sleep(EQUIPMENT_PURCHASE_DELAY);
                     }
                 }
+            }
+
+            // Print consolidated message for this member if any purchases were made
+            if (itemsPurchased > 0) {
+                ns.print(`💰 Bought ${itemsPurchased} item${itemsPurchased !== 1 ? 's' : ''} for ${member} ($${ns.formatNumber(memberTotalCost)})`);
             }
         }
     }
@@ -198,13 +207,27 @@ export async function main(ns) {
         const wantedPenalty = (gangInfo.wantedLevel / gangInfo.respect) * 100;
         const highWantedPenalty = wantedPenalty > WANTED_PENALTY_THRESHOLD;
 
-        // Get member info with combat stats
+        // Get member info with combat stats and ascension readiness
         const memberInfos = members.map(name => {
             const info = ns.gang.getMemberInformation(name);
+            const ascensionResult = ns.gang.getAscensionResult(name);
+
+            // Check if member can ascend with >= 8x multiplier (ready for first ascension)
+            let readyForInitialAscension = false;
+            if (ascensionResult) {
+                readyForInitialAscension =
+                    ascensionResult.str >= INITIAL_ASCENSION_THRESHOLD ||
+                    ascensionResult.def >= INITIAL_ASCENSION_THRESHOLD ||
+                    ascensionResult.dex >= INITIAL_ASCENSION_THRESHOLD ||
+                    ascensionResult.agi >= INITIAL_ASCENSION_THRESHOLD;
+            }
+
             return {
                 name: name,
                 info: info,
-                avgCombatStats: (info.str + info.def + info.dex + info.agi) / 4
+                avgCombatStats: (info.str + info.def + info.dex + info.agi) / 4,
+                readyForInitialAscension: readyForInitialAscension,
+                hasAscended: info.str_asc_mult > 1 || info.def_asc_mult > 1 || info.dex_asc_mult > 1 || info.agi_asc_mult > 1
             };
         });
 
@@ -212,7 +235,10 @@ export async function main(ns) {
         const sortedByStats = [...memberInfos].sort((a, b) => b.avgCombatStats - a.avgCombatStats);
 
         // Find trained member with lowest respect to keep on terrorism (spreads respect before ascension)
-        const trainedMembers = memberInfos.filter(m => m.avgCombatStats >= TRAINING_STATS_THRESHOLD);
+        // Only consider members who have ascended at least once or are ready for initial ascension
+        const trainedMembers = memberInfos.filter(m =>
+            (m.hasAscended || m.readyForInitialAscension) && m.avgCombatStats >= TRAINING_STATS_THRESHOLD
+        );
         const lowestRespectMember = trainedMembers.length > 0
             ? trainedMembers.reduce((lowest, current) =>
                 current.info.earnedRespect < lowest.info.earnedRespect ? current : lowest
@@ -236,15 +262,18 @@ export async function main(ns) {
         }
 
         for (const memberData of memberInfos) {
-            const { name, info, avgCombatStats } = memberData;
+            const { name, info, avgCombatStats, readyForInitialAscension, hasAscended } = memberData;
             let newTask;
 
-            if (fullyControlled) {
-                // 100% territory - everyone does arms trafficking
-                newTask = TASKS.TRAFFIC_ARMS;
+            // New members: train until ready for x8 ascension (they're too weak for anything else)
+            if (!hasAscended && !readyForInitialAscension) {
+                newTask = TASKS.TRAIN_COMBAT;
             } else if (name === lowestRespectMember && avgCombatStats >= TRAINING_STATS_THRESHOLD) {
-                // ALWAYS: Keep lowest-respect member on terrorism to spread respect gains
+                // ALWAYS: Keep lowest-respect member on terrorism to spread respect gains (even at 100% territory)
                 newTask = TASKS.TERRORISM;
+            } else if (fullyControlled) {
+                // 100% territory - everyone else does arms trafficking
+                newTask = TASKS.TRAFFIC_ARMS;
             } else if (highWantedPenalty && avgCombatStats >= TRAINING_STATS_THRESHOLD) {
                 // HIGH PRIORITY: Wanted penalty negates all gains
                 // All other trained members do vigilante justice
