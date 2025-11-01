@@ -3,7 +3,7 @@ export async function main(ns) {
     // Configuration
     const MAX_GANG_MEMBERS = 12; // Hard cap in Bitburner
     const ASCENSION_MULTIPLIER_THRESHOLD = 2.0; // Ascend when new multiplier is 2x current
-    const INITIAL_ASCENSION_THRESHOLD = 8.0; // New members train until they can ascend at 8x
+    const READY_FOR_WORK_MULTIPLIER = 8.0; // New members train/ascend until 8x total (3 ascensions at 2x each)
     const TERRITORY_CLASH_WIN_THRESHOLD = 0.95; // Enable clashes at 95% win chance
     const WANTED_PENALTY_THRESHOLD = 1.0; // Do vigilante work if penalty > 1% (wantedLevel/respect*100)
     const WARFARE_MEMBERS_COUNT = 6; // Number of members to assign to territory warfare
@@ -207,27 +207,23 @@ export async function main(ns) {
         const wantedPenalty = (gangInfo.wantedLevel / gangInfo.respect) * 100;
         const highWantedPenalty = wantedPenalty > WANTED_PENALTY_THRESHOLD;
 
-        // Get member info with combat stats and ascension readiness
+        // Get member info with combat stats and ascension status
         const memberInfos = members.map(name => {
             const info = ns.gang.getMemberInformation(name);
-            const ascensionResult = ns.gang.getAscensionResult(name);
 
-            // Check if member can ascend with >= 8x multiplier (ready for first ascension)
-            let readyForInitialAscension = false;
-            if (ascensionResult) {
-                readyForInitialAscension =
-                    ascensionResult.str >= INITIAL_ASCENSION_THRESHOLD ||
-                    ascensionResult.def >= INITIAL_ASCENSION_THRESHOLD ||
-                    ascensionResult.dex >= INITIAL_ASCENSION_THRESHOLD ||
-                    ascensionResult.agi >= INITIAL_ASCENSION_THRESHOLD;
-            }
+            // Check if member has ascended enough times (8x multiplier = ~3 ascensions at 2x each)
+            // A member is ready for work when any combat stat has 8x+ total ascension multiplier
+            const readyForWork =
+                info.str_asc_mult >= READY_FOR_WORK_MULTIPLIER ||
+                info.def_asc_mult >= READY_FOR_WORK_MULTIPLIER ||
+                info.dex_asc_mult >= READY_FOR_WORK_MULTIPLIER ||
+                info.agi_asc_mult >= READY_FOR_WORK_MULTIPLIER;
 
             return {
                 name: name,
                 info: info,
                 avgCombatStats: (info.str + info.def + info.dex + info.agi) / 4,
-                readyForInitialAscension: readyForInitialAscension,
-                hasAscended: info.str_asc_mult > 1 || info.def_asc_mult > 1 || info.dex_asc_mult > 1 || info.agi_asc_mult > 1
+                readyForWork: readyForWork
             };
         });
 
@@ -235,9 +231,9 @@ export async function main(ns) {
         const sortedByStats = [...memberInfos].sort((a, b) => b.avgCombatStats - a.avgCombatStats);
 
         // Find trained member with lowest respect to keep on terrorism (spreads respect before ascension)
-        // Only consider members who have ascended at least once or are ready for initial ascension
+        // Only consider members who have 8x+ multiplier (ready for work)
         const trainedMembers = memberInfos.filter(m =>
-            (m.hasAscended || m.readyForInitialAscension) && m.avgCombatStats >= TRAINING_STATS_THRESHOLD
+            m.readyForWork && m.avgCombatStats >= TRAINING_STATS_THRESHOLD
         );
         const lowestRespectMember = trainedMembers.length > 0
             ? trainedMembers.reduce((lowest, current) =>
@@ -262,11 +258,11 @@ export async function main(ns) {
         }
 
         for (const memberData of memberInfos) {
-            const { name, info, avgCombatStats, readyForInitialAscension, hasAscended } = memberData;
+            const { name, info, avgCombatStats, readyForWork } = memberData;
             let newTask;
 
-            // New members: train until ready for x8 ascension (they're too weak for anything else)
-            if (!hasAscended && !readyForInitialAscension) {
+            // New members: train/ascend until 8x total multiplier (3 ascensions at 2x = 8x total)
+            if (!readyForWork) {
                 newTask = TASKS.TRAIN_COMBAT;
             } else if (name === lowestRespectMember && avgCombatStats >= TRAINING_STATS_THRESHOLD) {
                 // ALWAYS: Keep lowest-respect member on terrorism to spread respect gains (even at 100% territory)
