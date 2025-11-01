@@ -329,19 +329,41 @@ export async function main(ns) {
             if (!state.materialsPhase1Done) {
                 let allPurchased = true;
                 for (const city of CITIES) {
-                    // Buy materials using bulkPurchase
-                    // Hardware: 125 total
-                    const hardwareResult = ns.corporation.bulkPurchase(AGRICULTURE, city, "Hardware", 125);
-                    // AI Cores: 75 total
-                    const aiResult = ns.corporation.bulkPurchase(AGRICULTURE, city, "AI Cores", 75);
-                    // Real Estate: 27000 total
-                    const realEstateResult = ns.corporation.bulkPurchase(AGRICULTURE, city, "Real Estate", 27000);
+                    // Check current stored amounts
+                    const hardware = ns.corporation.getMaterial(AGRICULTURE, city, "Hardware");
+                    const aiCores = ns.corporation.getMaterial(AGRICULTURE, city, "AI Cores");
+                    const realEstate = ns.corporation.getMaterial(AGRICULTURE, city, "Real Estate");
 
-                    if (hardwareResult === 0 || aiResult === 0 || realEstateResult === 0) {
-                        allPurchased = false;
-                        ns.print(`⏳ ${city}: Waiting for funds to buy materials`);
+                    // Calculate how much more is needed
+                    const hardwareNeeded = Math.max(0, 125 - hardware.stored);
+                    const aiNeeded = Math.max(0, 75 - aiCores.stored);
+                    const realEstateNeeded = Math.max(0, 27000 - realEstate.stored);
+
+                    // Buy only what's needed
+                    if (hardwareNeeded > 0 || aiNeeded > 0 || realEstateNeeded > 0) {
+                        let purchased = 0;
+                        if (hardwareNeeded > 0) {
+                            const result = ns.corporation.bulkPurchase(AGRICULTURE, city, "Hardware", hardwareNeeded);
+                            if (result > 0) purchased++;
+                            ns.print(`  Hardware: ${result}/${hardwareNeeded} (have ${hardware.stored})`);
+                        }
+                        if (aiNeeded > 0) {
+                            const result = ns.corporation.bulkPurchase(AGRICULTURE, city, "AI Cores", aiNeeded);
+                            if (result > 0) purchased++;
+                            ns.print(`  AI Cores: ${result}/${aiNeeded} (have ${aiCores.stored})`);
+                        }
+                        if (realEstateNeeded > 0) {
+                            const result = ns.corporation.bulkPurchase(AGRICULTURE, city, "Real Estate", realEstateNeeded);
+                            if (result > 0) purchased++;
+                            ns.print(`  Real Estate: ${result}/${realEstateNeeded} (have ${realEstate.stored})`);
+                        }
+
+                        if (purchased === 0) {
+                            allPurchased = false;
+                            ns.print(`⏳ ${city}: Waiting for funds to buy materials`);
+                        }
                     } else {
-                        ns.print(`✓ ${city}: Purchased Hardware(${hardwareResult}), AI(${aiResult}), RE(${realEstateResult})`);
+                        ns.print(`✓ ${city}: Already has all materials`);
                     }
                 }
 
