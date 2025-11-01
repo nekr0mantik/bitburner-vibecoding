@@ -158,13 +158,12 @@ export async function main(ns) {
         const division = ns.corporation.getDivision(AGRICULTURE);
         const divisionCities = division.cities || [];
 
-        // Expand to all cities (one at a time)
+        // Expand to all cities
         for (const city of CITIES) {
             if (!divisionCities.includes(city)) {
                 try {
                     ns.corporation.expandCity(AGRICULTURE, city);
                     ns.print(`✓ Expanded to ${city}`);
-                    return; // One at a time, let it initialize
                 } catch (e) {
                     ns.print(`⏳ Can't afford expansion to ${city} yet`);
                     return;
@@ -172,32 +171,24 @@ export async function main(ns) {
             }
         }
 
-        // All cities expanded, now set up each one
-        for (const city of CITIES) {
-            ns.print(`→ Checking ${city}...`);
+        // Set up all cities in one go
+        const positions = ["Operations", "Engineer", "Business"];
 
-            // Check if office has size 3
+        for (const city of CITIES) {
+            // Upgrade office to size 3
             let office;
             try {
                 office = ns.corporation.getOffice(AGRICULTURE, city);
+                if (office.size < 3) {
+                    ns.corporation.upgradeOfficeSize(AGRICULTURE, city, 3 - office.size);
+                    ns.print(`✓ Office size 3 in ${city}`);
+                }
             } catch (e) {
-                ns.print(`⏳ Office not ready in ${city}`);
+                ns.print(`⏳ Can't afford office upgrade in ${city}`);
                 return;
             }
 
-            if (office.size < 3) {
-                const needed = 3 - office.size;
-                try {
-                    ns.corporation.upgradeOfficeSize(AGRICULTURE, city, needed);
-                    ns.print(`✓ Upgraded office size to 3 in ${city}`);
-                    return; // One upgrade at a time
-                } catch (e) {
-                    ns.print(`⏳ Can't afford office size upgrade in ${city} (need ${needed} more)`);
-                    return;
-                }
-            }
-
-            // Buy warehouse if needed
+            // Buy warehouse
             let hasWarehouse = true;
             try {
                 ns.corporation.getWarehouse(AGRICULTURE, city);
@@ -208,8 +199,7 @@ export async function main(ns) {
             if (!hasWarehouse) {
                 try {
                     ns.corporation.purchaseWarehouse(AGRICULTURE, city);
-                    ns.print(`✓ Purchased warehouse in ${city}`);
-                    return; // One at a time
+                    ns.print(`✓ Warehouse purchased in ${city}`);
                 } catch (e) {
                     ns.print(`⏳ Can't afford warehouse in ${city}`);
                     return;
@@ -222,49 +212,32 @@ export async function main(ns) {
                 try {
                     const neededLevels = Math.ceil((300 - warehouse.size) / 100);
                     ns.corporation.upgradeWarehouse(AGRICULTURE, city, neededLevels);
-                    ns.print(`✓ Upgraded warehouse in ${city} to 300`);
-                    return; // One at a time
+                    ns.print(`✓ Warehouse 300 in ${city}`);
                 } catch (e) {
                     ns.print(`⏳ Can't afford warehouse upgrade in ${city}`);
                     return;
                 }
             }
 
-            // Hire 3 employees directly into positions
+            // Hire all 3 employees
             const currentOffice = ns.corporation.getOffice(AGRICULTURE, city);
-            const employeeCount = currentOffice.numEmployees || 0;
-
-            // Hire employees into specific positions
-            const positions = ["Operations", "Engineer", "Business"];
-            if (employeeCount < 3) {
-                const position = positions[employeeCount];
-                const hired = ns.corporation.hireEmployee(AGRICULTURE, city, position);
-                if (hired) {
-                    ns.print(`✓ Hired ${position} in ${city} (${employeeCount + 1}/3)`);
-                    return; // One at a time
-                } else {
-                    ns.print(`⏳ Failed to hire ${position} in ${city} (may need funds or office space)`);
+            for (let i = currentOffice.numEmployees; i < 3; i++) {
+                const hired = ns.corporation.hireEmployee(AGRICULTURE, city, positions[i]);
+                if (!hired) {
+                    ns.print(`⏳ Failed to hire in ${city}`);
                     return;
                 }
             }
+            ns.print(`✓ Hired 3 employees in ${city}`);
 
-            // Enable Smart Supply (after all 3 employees are hired)
-            if (employeeCount >= 3) {
-                try {
-                    ns.corporation.setSmartSupply(AGRICULTURE, city, true);
-                    ns.print(`  ✓ Smart Supply enabled in ${city}`);
-                } catch (e) {
-                    ns.print(`  ⚠ Smart Supply failed in ${city}: ${e}`);
-                }
-
-                // Set up selling
-                try {
-                    ns.corporation.sellMaterial(AGRICULTURE, city, "Plants", "MAX", "MP");
-                    ns.corporation.sellMaterial(AGRICULTURE, city, "Food", "MAX", "MP");
-                    ns.print(`  ✓ Selling configured in ${city}`);
-                } catch (e) {
-                    ns.print(`  ⚠ Selling setup failed in ${city}: ${e}`);
-                }
+            // Enable Smart Supply and selling
+            try {
+                ns.corporation.setSmartSupply(AGRICULTURE, city, true);
+                ns.corporation.sellMaterial(AGRICULTURE, city, "Plants", "MAX", "MP");
+                ns.corporation.sellMaterial(AGRICULTURE, city, "Food", "MAX", "MP");
+                ns.print(`✓ Smart Supply & selling in ${city}`);
+            } catch (e) {
+                ns.print(`⚠ Setup failed in ${city}: ${e}`);
             }
         }
 
@@ -283,7 +256,6 @@ export async function main(ns) {
         ns.print(`✓ All cities expanded and set up`);
         state.phase = 3;
         state.subPhase = 0;
-        state.employeesReady = false;
     }
 
     /**
@@ -302,15 +274,13 @@ export async function main(ns) {
                 "Smart Factories"
             ];
 
-            let allLevel2 = true;
+            // Buy all upgrades to level 2 in one go
             for (const upgrade of upgrades) {
                 const level = ns.corporation.getUpgradeLevel(upgrade);
-                if (level < 2) {
-                    allLevel2 = false;
+                for (let i = level; i < 2; i++) {
                     try {
                         ns.corporation.levelUpgrade(upgrade);
-                        ns.print(`✓ Upgraded ${upgrade} to level ${level + 1}`);
-                        return;
+                        ns.print(`✓ ${upgrade} to level ${i + 1}`);
                     } catch (e) {
                         ns.print(`⏳ Can't afford ${upgrade} yet`);
                         return;
@@ -318,10 +288,8 @@ export async function main(ns) {
                 }
             }
 
-            if (allLevel2) {
-                ns.print(`✓ All upgrades at level 2`);
-                state.subPhase = 1;
-            }
+            ns.print(`✓ All upgrades at level 2`);
+            state.subPhase = 1;
         }
 
         // SubPhase 1: Buy materials (Hardware, AI Cores, Real Estate)
@@ -337,7 +305,7 @@ export async function main(ns) {
                     // Calculate how much more is needed
                     const hardwareNeeded = Math.max(0, 125 - hardware.stored);
                     const aiNeeded = Math.max(0, 75 - aiCores.stored);
-                    const realEstateNeeded = Math.max(0, 27000 - realEstate.stored);
+                    const realEstateNeeded = Math.max(0, 25000 - realEstate.stored);
 
                     // Buy only what's needed
                     if (hardwareNeeded > 0 || aiNeeded > 0 || realEstateNeeded > 0) {
