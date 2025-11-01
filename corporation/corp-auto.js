@@ -150,8 +150,8 @@ export async function main(ns) {
             ns.print(`State: ${corp.state}`);
             ns.print("");
 
-            // Adjust selling prices after setup is complete (phase >= 2)
-            if (state.phase >= 2) {
+            // Adjust selling prices only during START phase (once per cycle)
+            if (state.phase >= 2 && corp.state === "START") {
                 adjustSellPrices(ns, corp);
             }
 
