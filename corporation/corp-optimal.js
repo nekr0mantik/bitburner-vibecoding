@@ -53,11 +53,17 @@ export async function main(ns) {
 
     /**
      * Buy tea/party to maintain employee morale and energy
+     * Only for offices with 9+ employees (per guide)
      */
     function maintainEmployees(ns, divisionName, cities) {
         for (const city of cities) {
             try {
                 const office = ns.corporation.getOffice(divisionName, city);
+
+                // Only maintain morale/energy for offices with 9+ employees
+                if (office.size < 9) {
+                    continue;
+                }
 
                 // Buy tea if energy < 99
                 if (office.avgEnergy < 99) {
