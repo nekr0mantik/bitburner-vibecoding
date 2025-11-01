@@ -421,12 +421,12 @@ export async function main(ns) {
             }
         }
 
-        // SubPhase 1: Upgrade Smart Factories and Smart Storage to level 10
+        // SubPhase 1: Upgrade Smart Factories and Smart Storage to level 5
         if (state.subPhase === 1) {
             const factories = ns.corporation.getUpgradeLevel("Smart Factories");
             const storage = ns.corporation.getUpgradeLevel("Smart Storage");
 
-            if (factories < 10) {
+            if (factories < 5) {
                 try {
                     ns.corporation.levelUpgrade("Smart Factories");
                     ns.print(`✓ Smart Factories to level ${factories + 1}`);
@@ -437,7 +437,7 @@ export async function main(ns) {
                 }
             }
 
-            if (storage < 10) {
+            if (storage < 5) {
                 try {
                     ns.corporation.levelUpgrade("Smart Storage");
                     ns.print(`✓ Smart Storage to level ${storage + 1}`);
@@ -448,19 +448,19 @@ export async function main(ns) {
                 }
             }
 
-            ns.print(`✓ Smart Factories and Smart Storage at level 10`);
+            ns.print(`✓ Smart Factories and Smart Storage at level 5`);
             state.subPhase = 2;
         }
 
-        // SubPhase 2: Upgrade warehouses to 2000
+        // SubPhase 2: Upgrade warehouses to 1000
         if (state.subPhase === 2) {
             let allUpgraded = true;
             for (const city of CITIES) {
                 const warehouse = ns.corporation.getWarehouse(AGRICULTURE, city);
-                if (warehouse.size < 2000) {
+                if (warehouse.size < 1000) {
                     allUpgraded = false;
                     try {
-                        const neededLevels = Math.min(7, Math.ceil((2000 - warehouse.size) / 100));
+                        const neededLevels = Math.min(7, Math.ceil((1000 - warehouse.size) / 100));
                         ns.corporation.upgradeWarehouse(AGRICULTURE, city, neededLevels);
                         ns.print(`✓ Upgraded warehouse in ${city}`);
                     } catch (e) {
@@ -471,12 +471,12 @@ export async function main(ns) {
             }
 
             if (allUpgraded) {
-                ns.print(`✓ All warehouses at 2000`);
+                ns.print(`✓ All warehouses at 1000`);
                 state.subPhase = 3;
             }
         }
 
-        // SubPhase 3: Buy more materials (Hardware: 2800, Robots: 96, AI Cores: 2520, Real Estate: 146400)
+        // SubPhase 3: Buy more materials (Hardware: 1400, Robots: 48, AI Cores: 1260, Real Estate: 73200)
         if (state.subPhase === 3) {
             if (!state.materialsPhase4aDone) {
                 let allPurchased = true;
@@ -488,10 +488,10 @@ export async function main(ns) {
                     const realEstate = ns.corporation.getMaterial(AGRICULTURE, city, "Real Estate");
 
                     // Calculate how much more is needed
-                    const hardwareNeeded = Math.max(0, 2800 - hardware.stored);
-                    const robotsNeeded = Math.max(0, 96 - robots.stored);
-                    const aiNeeded = Math.max(0, 2520 - aiCores.stored);
-                    const realEstateNeeded = Math.max(0, 146400 - realEstate.stored);
+                    const hardwareNeeded = Math.max(0, 1400 - hardware.stored);
+                    const robotsNeeded = Math.max(0, 48 - robots.stored);
+                    const aiNeeded = Math.max(0, 1260 - aiCores.stored);
+                    const realEstateNeeded = Math.max(0, 73200 - realEstate.stored);
 
                     // Buy only what's needed
                     if (hardwareNeeded > 0 || robotsNeeded > 0 || aiNeeded > 0 || realEstateNeeded > 0) {
