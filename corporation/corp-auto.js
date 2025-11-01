@@ -52,6 +52,8 @@ export async function main(ns) {
         const divisions = corp.divisions || [];
         if (!divisions.includes(AGRICULTURE)) return;
 
+        ns.print("--- Price Adjustments ---");
+
         for (const city of CITIES) {
             try {
                 const warehouse = ns.corporation.getWarehouse(AGRICULTURE, city);
@@ -87,44 +89,54 @@ export async function main(ns) {
 
         // Determine price adjustment
         let newPrice = material.desiredSellPrice || "MP";
+        let reason = "";
 
         // If warehouse is filling up (>10% of capacity), reduce price significantly
         if (fillPercentage > 0.1) {
             // Reduce price based on how full the warehouse is
             const reduction = Math.max(0.4, 1 - (fillPercentage * 2));
             newPrice = `MP*${reduction.toFixed(2)}`;
+            reason = `warehouse ${(fillPercentage * 100).toFixed(1)}% full`;
         }
         // If stored is very low but sales < production, reduce price to move inventory
         else if (stored > production * 2 && actualSales < production * 0.95) {
             newPrice = "MP*0.90";
+            reason = "stored > 2×prod, sales < 95%";
         }
         // If stored == 0 and sales == production, increase price to maximize profit
         else if (stored < production * 0.1 && salesRatio > 0.99 && salesRatio <= 1.01) {
             // Gradually increase price to find the sweet spot
             newPrice = "MP*1.02";
+            reason = "low stock, perfect sales - increase for profit";
         }
         // If sales are too high (>production) and inventory is low, increase price
         else if (stored < production && actualSales > production * 1.05) {
             newPrice = "MP*1.05";
+            reason = "overselling - increase price";
         }
         // Target: sales at 95-99% of production (sweet spot)
         else if (salesRatio >= 0.95 && salesRatio < 0.99 && stored < production * 2) {
             // Perfect balance - maintain current price or use MP
             newPrice = "MP*1.01";
+            reason = "sweet spot (95-99% sales)";
         }
         // If sales too low compared to production, reduce price
         else if (salesRatio < 0.90 && stored > 0) {
             newPrice = "MP*0.85";
+            reason = "underselling (<90%)";
         }
         // Default to market price
         else {
             newPrice = "MP";
+            reason = "balanced";
         }
 
         // Only update if price changed
         if (newPrice !== material.desiredSellPrice) {
             try {
                 ns.corporation.sellMaterial(AGRICULTURE, city, materialName, "MAX", newPrice);
+                ns.print(`${city} ${materialName}: ${material.desiredSellPrice} → ${newPrice}`);
+                ns.print(`  Store:${stored.toFixed(1)} Prod:${production.toFixed(1)} Sales:${actualSales.toFixed(1)} (${(salesRatio * 100).toFixed(1)}%) - ${reason}`);
             } catch (e) {
                 // Ignore errors
             }
