@@ -55,8 +55,9 @@ export async function main(ns) {
             const gangInfo = ns.gang.getGangInformation();
             const territory = gangInfo.territory;
 
-            // Calculate wanted level penalty
+            // Calculate wanted level penalty (capped at 99.99% for display)
             const wantedPenalty = (gangInfo.wantedLevel / gangInfo.respect) * 100;
+            const displayPenalty = Math.min(wantedPenalty, 99.99);
 
             ns.clearLog();
             ns.print("=== Gang Manager Status ===");
@@ -65,7 +66,7 @@ export async function main(ns) {
             ns.print(`Territory: ${(territory * 100).toFixed(2)}%`);
             ns.print(`Respect: ${ns.formatNumber(gangInfo.respect)}`);
             ns.print(`Wanted Level: ${ns.formatNumber(gangInfo.wantedLevel)}`);
-            ns.print(`Wanted Penalty: ${wantedPenalty.toFixed(2)}% (keep low)`);
+            ns.print(`Wanted Penalty: ${displayPenalty.toFixed(2)}% (keep low)`);
             ns.print("");
 
             // 1. Recruit new members
@@ -252,8 +253,10 @@ export async function main(ns) {
 
         // When wanted penalty is high, it negates ALL gang gains
         // Priority: get penalty under control ASAP by assigning all trained members to vigilante
-        if (highWantedPenalty) {
-            ns.print(`⚠️  HIGH WANTED PENALTY: ${wantedPenalty.toFixed(2)}% (negates all gains!)`);
+        // Only show warning if we actually have trained members to do vigilante
+        if (highWantedPenalty && trainedMembers.length > 0) {
+            const displayPenalty = Math.min(wantedPenalty, 99.99);
+            ns.print(`⚠️  HIGH WANTED PENALTY: ${displayPenalty.toFixed(2)}% (negates all gains!)`);
             ns.print(`   PRIORITY: All trained members on vigilante justice (except terrorism member)`);
         }
 
