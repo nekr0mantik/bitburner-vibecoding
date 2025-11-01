@@ -230,15 +230,15 @@ export async function main(ns) {
             }
         }
 
-        // For Agriculture, set material purchases
+        // For Agriculture, set material purchases and sales
         if (ns.corporation.getDivision(divisionName).type === "Agriculture") {
             try {
-                // Buy materials needed for production
-                ns.corporation.buyMaterial(divisionName, city, "Water", 500);
-                ns.corporation.buyMaterial(divisionName, city, "Energy", 500);
-                ns.corporation.buyMaterial(divisionName, city, "Hardware", 25);
-                ns.corporation.buyMaterial(divisionName, city, "AI Cores", 3);
-                ns.corporation.buyMaterial(divisionName, city, "Real Estate", 2700);
+                // Use bulk purchase for efficiency - buy materials needed for production
+                ns.corporation.bulkPurchase(divisionName, city, "Water", 500);
+                ns.corporation.bulkPurchase(divisionName, city, "Energy", 500);
+                ns.corporation.bulkPurchase(divisionName, city, "Hardware", 125);
+                ns.corporation.bulkPurchase(divisionName, city, "AI Cores", 75);
+                ns.corporation.bulkPurchase(divisionName, city, "Real Estate", 27000);
 
                 // Sell output
                 ns.corporation.sellMaterial(divisionName, city, "Plants", "MAX", "MP");

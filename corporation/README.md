@@ -124,17 +124,19 @@ The script shows real-time information:
 
 ## Material Management (Agriculture)
 
-The script automatically:
-- **Buys Materials**:
-  - Water: 500/s
-  - Energy: 500/s
-  - Hardware: 25/s
-  - AI Cores: 3/s
-  - Real Estate: 2,700/s
+The script automatically uses bulk purchasing for efficiency:
+- **Bulk Buys Materials**:
+  - Water: 500 units
+  - Energy: 500 units
+  - Hardware: 125 units
+  - AI Cores: 75 units
+  - Real Estate: 27,000 units
 
 - **Sells Products**:
   - Plants: MAX at market price
   - Food: MAX at market price
+
+**Note**: Uses `bulkPurchase` for one-time efficient material buying rather than continuous purchasing.
 
 ## Investment Rounds
 
