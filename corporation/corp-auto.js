@@ -82,21 +82,42 @@ export async function main(ns) {
         // Calculate how full the warehouse is with this material
         const fillPercentage = stored / warehouseCapacity;
 
+        // Calculate sales to production ratio
+        const salesRatio = production > 0 ? actualSales / production : 0;
+
         // Determine price adjustment
         let newPrice = material.desiredSellPrice || "MP";
 
-        // If warehouse is filling up (>10% of capacity) or sales < production, reduce price
-        if (fillPercentage > 0.1 || (stored > production * 2 && actualSales < production)) {
-            // Reduce price significantly based on how much is stored
-            const reduction = Math.max(0.5, 1 - (fillPercentage * 2));
+        // If warehouse is filling up (>10% of capacity), reduce price significantly
+        if (fillPercentage > 0.1) {
+            // Reduce price based on how full the warehouse is
+            const reduction = Math.max(0.4, 1 - (fillPercentage * 2));
             newPrice = `MP*${reduction.toFixed(2)}`;
         }
-        // If warehouse is nearly empty and sales > production, increase price slightly
-        else if (stored < production && actualSales > production * 1.1) {
+        // If stored is very low but sales < production, reduce price to move inventory
+        else if (stored > production * 2 && actualSales < production * 0.95) {
+            newPrice = "MP*0.90";
+        }
+        // If stored == 0 and sales == production, increase price to maximize profit
+        else if (stored < production * 0.1 && salesRatio > 0.99 && salesRatio <= 1.01) {
+            // Gradually increase price to find the sweet spot
+            newPrice = "MP*1.02";
+        }
+        // If sales are too high (>production) and inventory is low, increase price
+        else if (stored < production && actualSales > production * 1.05) {
+            newPrice = "MP*1.05";
+        }
+        // Target: sales at 95-99% of production (sweet spot)
+        else if (salesRatio >= 0.95 && salesRatio < 0.99 && stored < production * 2) {
+            // Perfect balance - maintain current price or use MP
             newPrice = "MP*1.01";
         }
-        // If things are balanced, use MP
-        else if (stored < production * 2 && Math.abs(actualSales - production) < production * 0.1) {
+        // If sales too low compared to production, reduce price
+        else if (salesRatio < 0.90 && stored > 0) {
+            newPrice = "MP*0.85";
+        }
+        // Default to market price
+        else {
             newPrice = "MP";
         }
 
