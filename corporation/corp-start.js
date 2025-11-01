@@ -37,7 +37,7 @@ export async function main(ns) {
     const corp = ns.corporation.getCorporation();
 
     // Check if we have divisions, if not create Agriculture
-    let divisions = corp.divisions;
+    let divisions = corp.divisions || [];
     if (divisions.length === 0) {
         try {
             ns.corporation.expandIndustry(INITIAL_INDUSTRY, INITIAL_INDUSTRY);

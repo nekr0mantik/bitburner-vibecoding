@@ -6,7 +6,6 @@ export async function main(ns) {
     const TARGET_OFFICE_SIZE = 30; // Expand to 30 employees per office
     const INITIAL_WAREHOUSE_SIZE = 300; // Initial warehouse size
     const TARGET_WAREHOUSE_SIZE = 3800; // Target warehouse size
-    const SMART_SUPPLY_ENABLED = true;
 
     // Employee assignment ratios for Agriculture
     const EMPLOYEE_RATIOS = {
@@ -47,20 +46,35 @@ export async function main(ns) {
             ns.print(`Revenue: $${ns.formatNumber(corp.revenue)}/s`);
             ns.print(`Expenses: $${ns.formatNumber(corp.expenses)}/s`);
             ns.print(`Profit: $${ns.formatNumber(corp.revenue - corp.expenses)}/s`);
-            ns.print(`Divisions: ${corp.divisions.length}`);
+            ns.print(`Divisions: ${(corp.divisions || []).length}`);
             ns.print(`State: ${corp.state}`);
             ns.print("");
 
-            // Manage each division
-            for (const divisionName of corp.divisions) {
-                await manageDivision(ns, divisionName, config, corp);
+            // FIRST PRIORITY: Unlock Smart Supply before doing anything else
+            await unlockSmartSupply(ns, corp);
+
+            // Only manage divisions if Smart Supply is unlocked
+            const hasSmartSupply = ns.corporation.hasUnlock("Smart Supply");
+            if (hasSmartSupply) {
+                // Manage each division
+                for (const divisionName of (corp.divisions || [])) {
+                    await manageDivision(ns, divisionName, config, corp);
+                }
+
+                // Try to accept investment if needed
+                await manageInvestment(ns, corp);
+
+                // Purchase other upgrades
+                await unlockOtherUpgrades(ns, corp);
+                await purchaseUpgrades(ns, corp);
+            } else {
+                ns.print("");
+                ns.print("⚠️  WAITING FOR SMART SUPPLY UNLOCK");
+                ns.print("   Smart Supply is required before operations can begin.");
+                const cost = ns.corporation.getUnlockCost("Smart Supply");
+                ns.print(`   Cost: $${ns.formatNumber(cost)}`);
+                ns.print(`   Current funds: $${ns.formatNumber(corp.funds)}`);
             }
-
-            // Try to accept investment if needed
-            await manageInvestment(ns, corp);
-
-            // Purchase corporation upgrades
-            await purchaseUpgrades(ns, corp);
 
         } catch (error) {
             ns.print(`ERROR: ${error}`);
@@ -77,14 +91,14 @@ export async function main(ns) {
 
         ns.print(`=== ${divisionName} Division ===`);
         ns.print(`Type: ${division.type}`);
-        ns.print(`Cities: ${division.cities.length}`);
+        ns.print(`Cities: ${(division.cities || []).length}`);
         ns.print("");
 
         // Expand to all cities if not already
         await expandToAllCities(ns, divisionName, config.cities);
 
         // Manage each city
-        for (const city of division.cities) {
+        for (const city of (division.cities || [])) {
             await manageCity(ns, divisionName, city, corp);
         }
     }
@@ -94,9 +108,10 @@ export async function main(ns) {
      */
     async function expandToAllCities(ns, divisionName, cities) {
         const division = ns.corporation.getDivision(divisionName);
+        const divisionCities = division.cities || [];
 
         for (const city of cities) {
-            if (!division.cities.includes(city)) {
+            if (!divisionCities.includes(city)) {
                 try {
                     ns.corporation.expandCity(divisionName, city);
                     ns.print(`✓ Expanded ${divisionName} to ${city}`);
@@ -127,11 +142,15 @@ export async function main(ns) {
         }
 
         // Hire employees to fill all positions
-        while (office.employees.length < office.size) {
+        let currentEmployees = office.employees || [];
+        while (currentEmployees.length < office.size) {
             try {
                 const employee = ns.corporation.hireEmployee(divisionName, city);
                 if (employee) {
                     ns.print(`✓ Hired employee in ${city}`);
+                    // Refresh office data
+                    const updatedOffice = ns.corporation.getOffice(divisionName, city);
+                    currentEmployees = updatedOffice.employees || [];
                 } else {
                     break;
                 }
@@ -151,7 +170,8 @@ export async function main(ns) {
      * Assign employees to positions based on ratios
      */
     async function assignEmployees(ns, divisionName, city, office) {
-        const totalEmployees = office.employees.length;
+        const employees = office.employees || [];
+        const totalEmployees = employees.length;
         if (totalEmployees === 0) return;
 
         // Calculate target counts for each position
@@ -204,48 +224,133 @@ export async function main(ns) {
         }
 
         const warehouse = ns.corporation.getWarehouse(divisionName, city);
+        const division = ns.corporation.getDivision(divisionName);
 
-        // Upgrade warehouse if needed
-        if (warehouse.size < TARGET_WAREHOUSE_SIZE && corp.funds > 1e9) {
+        // Calculate warehouse usage
+        const warehouseUsed = warehouse.sizeUsed || 0;
+        const warehouseSize = warehouse.size || 0;
+        const usagePercent = warehouseSize > 0 ? (warehouseUsed / warehouseSize) * 100 : 0;
+
+        // Log warehouse status for Agriculture
+        if (division.type === "Agriculture") {
+            ns.print(`  ${city} Warehouse: ${ns.formatNumber(warehouseUsed)}/${ns.formatNumber(warehouseSize)} (${usagePercent.toFixed(1)}%)`);
+        }
+
+        // Only upgrade warehouse if it's getting full (>80% capacity)
+        if (usagePercent > 80 && warehouse.size < TARGET_WAREHOUSE_SIZE) {
             try {
                 const upgradeLevels = Math.min(10, Math.floor((TARGET_WAREHOUSE_SIZE - warehouse.size) / 100));
-                if (upgradeLevels > 0) {
+                if (upgradeLevels > 0 && corp.funds > 1e9) {
                     ns.corporation.upgradeWarehouse(divisionName, city, upgradeLevels);
-                    ns.print(`✓ Upgraded warehouse in ${city} by ${upgradeLevels} levels`);
+                    ns.print(`  ${city}: ✓ Upgraded warehouse by ${upgradeLevels} levels (was ${usagePercent.toFixed(1)}% full)`);
                 }
             } catch (e) {
                 // Can't upgrade
             }
         }
 
-        // Enable smart supply
-        if (SMART_SUPPLY_ENABLED) {
+        // Manage materials for Agriculture (Smart Supply must be unlocked to reach here)
+        if (division.type === "Agriculture") {
+            // Enable Smart Supply for automatic material management
             try {
-                const division = ns.corporation.getDivision(divisionName);
-                if (division.type === "Agriculture") {
-                    ns.corporation.setSmartSupply(divisionName, city, true);
-                }
+                ns.corporation.setSmartSupply(divisionName, city, true);
+                ns.corporation.setSmartSupplyUseLeftovers(divisionName, city, true);
             } catch (e) {
-                // Smart supply not unlocked yet
+                // Smart Supply might already be enabled
             }
-        }
 
-        // For Agriculture, set material purchases
-        if (ns.corporation.getDivision(divisionName).type === "Agriculture") {
+            // Buy boost materials to improve production (Hardware:Robots:AI Cores:Real Estate = 1:1:1:5 ratio)
+            await buyBoostMaterials(ns, divisionName, city, corp, warehouse);
+
+            // Set up selling for output materials
             try {
-                // Buy materials needed for production
-                ns.corporation.buyMaterial(divisionName, city, "Water", 500);
-                ns.corporation.buyMaterial(divisionName, city, "Energy", 500);
-                ns.corporation.buyMaterial(divisionName, city, "Hardware", 25);
-                ns.corporation.buyMaterial(divisionName, city, "AI Cores", 3);
-                ns.corporation.buyMaterial(divisionName, city, "Real Estate", 2700);
-
-                // Sell output
                 ns.corporation.sellMaterial(divisionName, city, "Plants", "MAX", "MP");
                 ns.corporation.sellMaterial(divisionName, city, "Food", "MAX", "MP");
             } catch (e) {
-                // Material management failed
+                // Selling setup failed
             }
+        }
+    }
+
+    /**
+     * Buy boost materials to improve production
+     * Ratio: Hardware:Robots:AI Cores:Real Estate = 1:1:1:5
+     */
+    async function buyBoostMaterials(ns, divisionName, city, corp, warehouse) {
+        try {
+            // Get current material quantities
+            const hardware = ns.corporation.getMaterial(divisionName, city, "Hardware");
+            const robots = ns.corporation.getMaterial(divisionName, city, "Robots");
+            const aiCores = ns.corporation.getMaterial(divisionName, city, "AI Cores");
+            const realEstate = ns.corporation.getMaterial(divisionName, city, "Real Estate");
+
+            // Calculate material sizes (approximate)
+            const HARDWARE_SIZE = 0.06;
+            const ROBOTS_SIZE = 0.5;
+            const AI_CORES_SIZE = 0.1;
+            const REAL_ESTATE_SIZE = 0.005;
+
+            // Determine the target amount based on the lowest ratio component
+            // Ratio is 1:1:1:5 for Hardware:Robots:AI:RealEstate
+            const currentRatios = {
+                hardware: hardware.qty,
+                robots: robots.qty,
+                aiCores: aiCores.qty,
+                realEstate: realEstate.qty / 5  // Divide by 5 because we want 5x more
+            };
+
+            // Find the minimum to determine what to boost
+            const minRatio = Math.min(currentRatios.hardware, currentRatios.robots, currentRatios.aiCores, currentRatios.realEstate);
+
+            // Calculate how much we need to buy to balance the ratios
+            const toBuy = {
+                hardware: Math.max(0, minRatio + 10 - hardware.qty),
+                robots: Math.max(0, minRatio + 10 - robots.qty),
+                aiCores: Math.max(0, minRatio + 10 - aiCores.qty),
+                realEstate: Math.max(0, (minRatio + 10) * 5 - realEstate.qty)
+            };
+
+            // Calculate space needed
+            const spaceNeeded =
+                toBuy.hardware * HARDWARE_SIZE +
+                toBuy.robots * ROBOTS_SIZE +
+                toBuy.aiCores * AI_CORES_SIZE +
+                toBuy.realEstate * REAL_ESTATE_SIZE;
+
+            // Calculate available space (keep 20% buffer for production)
+            const availableSpace = (warehouse.size - warehouse.sizeUsed) * 0.8;
+
+            // Reserve funds for potential warehouse upgrade
+            const warehouseUpgradeCost = warehouse.size < TARGET_WAREHOUSE_SIZE ? 1e9 : 0;
+            const availableFunds = corp.funds - warehouseUpgradeCost;
+
+            // Only buy if we have space and funds
+            if (spaceNeeded < availableSpace && availableFunds > 1e8) {
+                // Calculate cost for materials
+                const hardwareCost = ns.corporation.getMaterialData("Hardware").baseCost * toBuy.hardware;
+                const robotsCost = ns.corporation.getMaterialData("Robots").baseCost * toBuy.robots;
+                const aiCoresCost = ns.corporation.getMaterialData("AI Cores").baseCost * toBuy.aiCores;
+                const realEstateCost = ns.corporation.getMaterialData("Real Estate").baseCost * toBuy.realEstate;
+                const totalCost = hardwareCost + robotsCost + aiCoresCost + realEstateCost;
+
+                if (availableFunds > totalCost * 2) { // Only buy if we have 2x the cost
+                    // Buy the materials
+                    if (toBuy.hardware > 0) {
+                        ns.corporation.buyMaterial(divisionName, city, "Hardware", toBuy.hardware / 10);
+                    }
+                    if (toBuy.robots > 0) {
+                        ns.corporation.buyMaterial(divisionName, city, "Robots", toBuy.robots / 10);
+                    }
+                    if (toBuy.aiCores > 0) {
+                        ns.corporation.buyMaterial(divisionName, city, "AI Cores", toBuy.aiCores / 10);
+                    }
+                    if (toBuy.realEstate > 0) {
+                        ns.corporation.buyMaterial(divisionName, city, "Real Estate", toBuy.realEstate / 10);
+                    }
+                }
+            }
+        } catch (e) {
+            // Material buying failed
         }
     }
 
@@ -272,21 +377,69 @@ export async function main(ns) {
     }
 
     /**
+     * Unlock Smart Supply - HIGHEST PRIORITY
+     */
+    async function unlockSmartSupply(ns, corp) {
+        const upgradeName = "Smart Supply";
+        try {
+            const hasUnlock = ns.corporation.hasUnlock(upgradeName);
+            if (!hasUnlock) {
+                const cost = ns.corporation.getUnlockCost(upgradeName);
+                if (corp.funds >= cost) {
+                    ns.corporation.purchaseUnlock(upgradeName);
+                    ns.print(`✓✓✓ UNLOCKED ${upgradeName} (Cost: $${ns.formatNumber(cost)}) ✓✓✓`);
+                    ns.print("");
+                }
+            }
+        } catch (e) {
+            ns.print(`ERROR unlocking Smart Supply: ${e}`);
+        }
+    }
+
+    /**
+     * Unlock other useful one-time upgrades
+     */
+    async function unlockOtherUpgrades(ns, corp) {
+        // Other useful unlocks
+        const otherUnlocks = [
+            "Warehouse API",     // Allows warehouse management
+            "Office API",        // Allows office management
+            "Export"            // Allows exporting materials between divisions
+        ];
+
+        for (const unlockName of otherUnlocks) {
+            try {
+                const hasUnlock = ns.corporation.hasUnlock(unlockName);
+                if (!hasUnlock) {
+                    const cost = ns.corporation.getUnlockCost(unlockName);
+                    if (corp.funds > cost * 10) { // Only buy if we have 10x the cost
+                        ns.corporation.purchaseUnlock(unlockName);
+                        ns.print(`✓ Unlocked ${unlockName} (Cost: $${ns.formatNumber(cost)})`);
+                    }
+                }
+            } catch (e) {
+                // Upgrade doesn't exist or can't be unlocked
+            }
+        }
+    }
+
+    /**
      * Purchase corporation upgrades
      */
     async function purchaseUpgrades(ns, corp) {
-        // List of useful upgrades
+        // List of useful upgrades in priority order
         const upgrades = [
-            "Smart Factories",
-            "Smart Storage",
-            "DreamSense",
-            "Wilson Analytics",
-            "Nuoptimal Nootropic Injector Implants",
-            "Speech Processor Implants",
-            "Neural Accelerators",
-            "FocusWires",
-            "ABC SalesBots",
-            "Project Insight"
+            "Wilson Analytics",   // Essential for production analysis
+            "Smart Factories",    // Increases production
+            "Smart Storage",      // Increases storage efficiency
+            "AdVert.Inc",        // Improves sales (demand/competition)
+            "FocusWires",        // Improves employee stats
+            "Neural Accelerators", // Improves employee stats
+            "Speech Processor Implants", // Improves employee stats
+            "Nuoptimal Nootropic Injector Implants", // Improves employee stats
+            "Project Insight",   // Reduces corruption
+            "ABC SalesBots",     // Improves sales
+            "DreamSense"         // Expensive late-game upgrade
         ];
 
         for (const upgradeName of upgrades) {
