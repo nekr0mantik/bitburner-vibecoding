@@ -79,56 +79,54 @@ export async function main(ns) {
         const stored = material.stored;
         const production = material.productionAmount;
         const actualSales = material.actualSellAmount;
-        const warehouseCapacity = warehouse.size;
-
-        // Calculate how full the warehouse is with this material
-        const fillPercentage = stored / warehouseCapacity;
 
         // Calculate sales to production ratio
         const salesRatio = production > 0 ? actualSales / production : 0;
+
+        // Calculate inventory ratio: stored / (production per full cycle)
+        // Full cycle = 10 seconds, so total production per cycle = production * 10
+        const cycleProduction = production * 10;
+        const inventoryRatio = cycleProduction > 0 ? stored / cycleProduction : 0;
 
         // Determine price adjustment
         let newPrice = material.desiredSellPrice || "MP";
         let reason = "";
 
-        // If warehouse is filling up (>10% of capacity), reduce price significantly
-        if (fillPercentage > 0.1) {
-            // Reduce price based on how full the warehouse is
-            const reduction = Math.max(0.4, 1 - (fillPercentage * 2));
-            newPrice = `MP*${reduction.toFixed(2)}`;
-            reason = `warehouse ${(fillPercentage * 100).toFixed(1)}% full`;
+        // Base price multiplier on inventory ratio
+        let priceMultiplier = 1.0;
+
+        // If we have excess inventory, reduce price gradually
+        if (inventoryRatio > 0.1) {
+            // Price goes down as inventory builds up
+            // inventoryRatio 0.1 → 0.95x
+            // inventoryRatio 0.5 → 0.75x
+            // inventoryRatio 1.0 → 0.50x
+            // inventoryRatio 2.0 → 0.25x (capped at 0.5)
+            priceMultiplier = Math.max(0.5, 1.0 - (inventoryRatio * 0.5));
+            reason = `inventory ${(inventoryRatio * 100).toFixed(1)}% of cycle production`;
         }
-        // If stored is very low but sales < production, reduce price to move inventory
-        else if (stored > production * 2 && actualSales < production * 0.95) {
-            newPrice = "MP*0.90";
-            reason = "stored > 2×prod, sales < 95%";
+        // If inventory is very low and we're selling well, try to increase price gradually
+        else if (inventoryRatio < 0.05 && salesRatio > 0.95 && salesRatio < 1.05) {
+            // Increase price slightly to maximize profit
+            priceMultiplier = 1.01;
+            reason = "low inventory, good sales - optimizing price";
         }
-        // If stored == 0 and sales == production, increase price to maximize profit
-        else if (stored < production * 0.1 && salesRatio > 0.99 && salesRatio <= 1.01) {
-            // Gradually increase price to find the sweet spot
-            newPrice = "MP*1.02";
-            reason = "low stock, perfect sales - increase for profit";
-        }
-        // If sales are too high (>production) and inventory is low, increase price
-        else if (stored < production && actualSales > production * 1.05) {
-            newPrice = "MP*1.05";
-            reason = "overselling - increase price";
-        }
-        // Target: sales at 95-99% of production (sweet spot)
-        else if (salesRatio >= 0.95 && salesRatio < 0.99 && stored < production * 2) {
-            // Perfect balance - maintain current price or use MP
-            newPrice = "MP*1.01";
-            reason = "sweet spot (95-99% sales)";
-        }
-        // If sales too low compared to production, reduce price
-        else if (salesRatio < 0.90 && stored > 0) {
-            newPrice = "MP*0.85";
-            reason = "underselling (<90%)";
-        }
-        // Default to market price
-        else {
-            newPrice = "MP";
+        // If inventory is low and sales are good, maintain current price
+        else if (inventoryRatio < 0.1 && salesRatio > 0.90 && salesRatio < 1.05) {
+            priceMultiplier = 1.0;
             reason = "balanced";
+        }
+        // Default case
+        else {
+            priceMultiplier = 1.0;
+            reason = "default pricing";
+        }
+
+        // Format the new price
+        if (priceMultiplier === 1.0) {
+            newPrice = "MP";
+        } else {
+            newPrice = `MP*${priceMultiplier.toFixed(2)}`;
         }
 
         // Only update if price changed
@@ -136,7 +134,8 @@ export async function main(ns) {
             try {
                 ns.corporation.sellMaterial(AGRICULTURE, city, materialName, "MAX", newPrice);
                 ns.print(`${city} ${materialName}: ${material.desiredSellPrice} → ${newPrice}`);
-                ns.print(`  Store:${stored.toFixed(1)} Prod:${production.toFixed(1)} Sales:${actualSales.toFixed(1)} (${(salesRatio * 100).toFixed(1)}%) - ${reason}`);
+                ns.print(`  Store:${stored.toFixed(1)} Prod:${production.toFixed(1)}/s (${cycleProduction.toFixed(0)}/cycle) Sales:${actualSales.toFixed(1)} (${(salesRatio * 100).toFixed(1)}%) InvRatio:${(inventoryRatio * 100).toFixed(1)}%`);
+                ns.print(`  ${reason}`);
             } catch (e) {
                 // Ignore errors
             }
