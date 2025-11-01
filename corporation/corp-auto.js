@@ -327,40 +327,37 @@ export async function main(ns) {
         // SubPhase 1: Buy materials (Hardware, AI Cores, Real Estate)
         if (state.subPhase === 1) {
             if (!state.materialsPhase1Done) {
-                ns.print("⏳ Manual step required:");
-                ns.print("   Buy materials for each city (1 tick each):");
-                ns.print("   - Hardware: 12.5/s to 125 total");
-                ns.print("   - AI Cores: 7.5/s to 75 total");
-                ns.print("   - Real Estate: 2700/s to 27000 total");
-                ns.print("");
-                ns.print("   Set materialsPhase1Done = true in state file when complete");
+                let allPurchased = true;
+                for (const city of CITIES) {
+                    // Buy materials using bulkPurchase
+                    // Hardware: 125 total
+                    const hardwareResult = ns.corporation.bulkPurchase(AGRICULTURE, city, "Hardware", 125);
+                    // AI Cores: 75 total
+                    const aiResult = ns.corporation.bulkPurchase(AGRICULTURE, city, "AI Cores", 75);
+                    // Real Estate: 27000 total
+                    const realEstateResult = ns.corporation.bulkPurchase(AGRICULTURE, city, "Real Estate", 27000);
+
+                    if (hardwareResult === 0 || aiResult === 0 || realEstateResult === 0) {
+                        allPurchased = false;
+                        ns.print(`⏳ ${city}: Waiting for funds to buy materials`);
+                    } else {
+                        ns.print(`✓ ${city}: Purchased Hardware(${hardwareResult}), AI(${aiResult}), RE(${realEstateResult})`);
+                    }
+                }
+
+                if (allPurchased) {
+                    state.materialsPhase1Done = true;
+                    ns.print(`✓ All materials purchased`);
+                }
                 return;
             }
 
-            ns.print(`✓ Materials purchased`);
+            ns.print(`✓ Materials purchased, moving to investment`);
             state.subPhase = 2;
         }
 
-        // SubPhase 2: Wait for employee stats
+        // SubPhase 2: Accept first investment
         if (state.subPhase === 2) {
-            let allReady = true;
-            for (const city of CITIES) {
-                const office = ns.corporation.getOffice(AGRICULTURE, city);
-                if (office.avgMorale < 100 || office.avgHappiness < 99.998 || office.avgEnergy < 99.998) {
-                    allReady = false;
-                    ns.print(`⏳ ${city}: Morale ${office.avgMorale.toFixed(3)}, Happy ${office.avgHappiness.toFixed(3)}, Energy ${office.avgEnergy.toFixed(3)}`);
-                }
-            }
-
-            if (allReady) {
-                ns.print(`✓ All employees ready`);
-                state.subPhase = 3;
-            }
-            return;
-        }
-
-        // SubPhase 3: Accept first investment
-        if (state.subPhase === 3) {
             if (state.investmentRound === 0) {
                 const offer = ns.corporation.getInvestmentOffer();
                 if (offer.round === 1) {
