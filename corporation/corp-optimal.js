@@ -362,7 +362,7 @@ export async function main(ns) {
             state.phase = 7;
         }
 
-        // Phase 7: Buy boost materials (per second, not bulk)
+        // Phase 7: Buy boost materials using bulkPurchase (safer than per-second)
         // Simple strategy: Hardware 125, AI 75, Real Estate 27000 per city
         if (state.phase === 7) {
             let allDone = true;
@@ -372,26 +372,47 @@ export async function main(ns) {
                 const ai = ns.corporation.getMaterial(AGRICULTURE, city, "AI Cores");
                 const re = ns.corporation.getMaterial(AGRICULTURE, city, "Real Estate");
 
-                // Buy if under target
+                // Use bulkPurchase to buy exact amounts (prevents warehouse clogging)
                 if (hw.stored < 125) {
-                    buyMaterialsPerSecond(ns, AGRICULTURE, city, "Hardware", (125 - hw.stored) / 10);
-                    allDone = false;
-                } else {
-                    stopBuyingMaterial(ns, AGRICULTURE, city, "Hardware");
+                    const needed = Math.max(0, 125 - hw.stored);
+                    try {
+                        ns.corporation.bulkPurchase(AGRICULTURE, city, "Hardware", needed);
+                        ns.print(`✓ Bought ${needed.toFixed(0)} Hardware in ${city}`);
+                    } catch (e) {
+                        ns.print(`⏳ Can't afford Hardware in ${city}`);
+                        allDone = false;
+                    }
                 }
 
                 if (ai.stored < 75) {
-                    buyMaterialsPerSecond(ns, AGRICULTURE, city, "AI Cores", (75 - ai.stored) / 10);
-                    allDone = false;
-                } else {
-                    stopBuyingMaterial(ns, AGRICULTURE, city, "AI Cores");
+                    const needed = Math.max(0, 75 - ai.stored);
+                    try {
+                        ns.corporation.bulkPurchase(AGRICULTURE, city, "AI Cores", needed);
+                        ns.print(`✓ Bought ${needed.toFixed(0)} AI Cores in ${city}`);
+                    } catch (e) {
+                        ns.print(`⏳ Can't afford AI Cores in ${city}`);
+                        allDone = false;
+                    }
                 }
 
                 if (re.stored < 27000) {
-                    buyMaterialsPerSecond(ns, AGRICULTURE, city, "Real Estate", (27000 - re.stored) / 10);
-                    allDone = false;
-                } else {
+                    const needed = Math.max(0, 27000 - re.stored);
+                    try {
+                        ns.corporation.bulkPurchase(AGRICULTURE, city, "Real Estate", needed);
+                        ns.print(`✓ Bought ${needed.toFixed(0)} Real Estate in ${city}`);
+                    } catch (e) {
+                        ns.print(`⏳ Can't afford Real Estate in ${city}`);
+                        allDone = false;
+                    }
+                }
+
+                if (hw.stored >= 125 && ai.stored >= 75 && re.stored >= 27000) {
+                    // This city is done, ensure no continuous buying
+                    stopBuyingMaterial(ns, AGRICULTURE, city, "Hardware");
+                    stopBuyingMaterial(ns, AGRICULTURE, city, "AI Cores");
                     stopBuyingMaterial(ns, AGRICULTURE, city, "Real Estate");
+                } else {
+                    allDone = false;
                 }
             }
 
